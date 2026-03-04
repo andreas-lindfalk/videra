@@ -13,12 +13,20 @@ const (
 	TransportHTTP  Transport = "http"
 )
 
+type IngestionMode string
+
+const (
+	IngestionModeSimulated IngestionMode = "simulated"
+	IngestionModeReal      IngestionMode = "real"
+)
+
 type Config struct {
 	Transport          Transport
 	HTTPAddr           string
 	DataDir            string
 	LogLevel           string
 	RuntimeMode        string
+	IngestionMode      IngestionMode
 	FrameIntervalSec   int
 	DefaultSearchLimit int
 	IndexConcurrency   int
@@ -33,6 +41,7 @@ func Load() (Config, error) {
 		DataDir:            "./data",
 		LogLevel:           "info",
 		RuntimeMode:        "local",
+		IngestionMode:      IngestionModeSimulated,
 		FrameIntervalSec:   5,
 		DefaultSearchLimit: 5,
 		IndexConcurrency:   4,
@@ -54,6 +63,9 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_RUNTIME_MODE"); ok {
 		cfg.RuntimeMode = strings.ToLower(strings.TrimSpace(value))
+	}
+	if value, ok := os.LookupEnv("VIDERA_INGESTION_MODE"); ok {
+		cfg.IngestionMode = IngestionMode(strings.ToLower(strings.TrimSpace(value)))
 	}
 	if value, ok := os.LookupEnv("VIDERA_FRAME_INTERVAL_SEC"); ok {
 		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.FrameIntervalSec); err != nil {
@@ -101,6 +113,9 @@ func Load() (Config, error) {
 	}
 	if cfg.RuntimeMode == "" {
 		return Config{}, fmt.Errorf("VIDERA_RUNTIME_MODE cannot be empty")
+	}
+	if cfg.IngestionMode != IngestionModeSimulated && cfg.IngestionMode != IngestionModeReal {
+		return Config{}, fmt.Errorf("unsupported VIDERA_INGESTION_MODE: %s", cfg.IngestionMode)
 	}
 	if cfg.SearchAudioWeight <= 0 {
 		return Config{}, fmt.Errorf("VIDERA_SEARCH_AUDIO_WEIGHT must be > 0")

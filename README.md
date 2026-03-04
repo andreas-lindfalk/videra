@@ -5,7 +5,8 @@ Privacy-native multimodal video memory MCP server in Go.
 ## Current MVP Status
 
 - The local MCP flow is working end-to-end (`index_video`, `search_video`, `list_videos`, transcript resource).
-- Current transcript/visual text content is simulated placeholder content; this validates pipeline/runtime behavior more than true semantic understanding.
+- Default mode is `VIDERA_INGESTION_MODE=simulated` (fixture-like placeholder segments for deterministic testing).
+- A new local `real` ingestion mode is available: `VIDERA_INGESTION_MODE=real` uses sidecar transcript files (`.srt`, `.vtt`, `.txt`) next to the video file.
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 
 ## Quick Start (Local, Non-Cloud)
@@ -33,7 +34,7 @@ Mount a local folder into the container as `/videos` by setting `VIDERA_VIDEO_DI
 Quickest default flow (uses first video in `./videos`):
 
 ```bash
-make local-smoke-default QUERY="budget roadmap"
+make local-smoke-default QUERY="test query"
 ```
 
 Practical first-test flow (repo-local `./videos` folder):
@@ -48,9 +49,22 @@ make local-down
 
 By default, local media in `videos/` is ignored by Git (`videos/*` with `videos/.gitkeep` allowed).
 
+To test `real` ingestion mode locally, place a transcript sidecar next to the video file:
+
+- `./videos/IMG_3711.MOV`
+- `./videos/IMG_3711.txt` (or `.srt` / `.vtt`)
+
+Then run:
+
+```bash
+VIDERA_INGESTION_MODE=real make local-up
+make local-smoke VIDEO=/videos/videos/IMG_3711.MOV QUERY="test query"
+make local-down
+```
+
 ```bash
 VIDERA_VIDEO_DIR=/absolute/path/to/your/video/folder make local-up
-make local-smoke VIDEO=/videos/your-file.mp4 QUERY="budget roadmap"
+make local-smoke VIDEO=/videos/your-file.mp4 QUERY="test query"
 ```
 
 If you do not set `VIDERA_VIDEO_DIR`, compose mounts the repo root (`.`) to `/videos`.

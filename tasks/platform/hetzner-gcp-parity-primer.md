@@ -2,6 +2,12 @@
 
 Goal: support EU data-residency-sensitive customers with Hetzner as a first-class deployment path, while keeping Cloud Run equally supported.
 
+Related runbook:
+
+- `tasks/platform/hetzner-vm-docker-runbook.md`
+- `tasks/platform/cloud-run-runbook.md`
+- `tasks/platform/parity-validation-checklist.md`
+
 ## Quick Mental Model
 
 - Cloud Run is a serverless container runtime.

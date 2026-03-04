@@ -26,13 +26,13 @@ local-down:
 
 local-smoke:
 	@if [ -z "$(VIDEO)" ]; then \
-		echo "Usage: make local-smoke VIDEO=/videos/<file>.mp4 [QUERY='budget roadmap'] [ENDPOINT=http://localhost:8080/mcp]"; \
+		echo "Usage: make local-smoke VIDEO=/videos/<file>.mp4 [QUERY='test query'] [ENDPOINT=http://localhost:8080/mcp]"; \
 		exit 1; \
 	fi
 	@go run ./cmd/localsmoke \
 		--endpoint "$(or $(ENDPOINT),http://localhost:8080/mcp)" \
 		--video "$(VIDEO)" \
-		--query "$(or $(QUERY),budget roadmap)"
+		--query "$(or $(QUERY),test query)"
 
 local-smoke-default:
 	@if [ ! -d "./videos" ]; then \
@@ -47,7 +47,7 @@ local-smoke-default:
 	fi; \
 	BASENAME="$$(basename "$$VIDEO_FILE")"; \
 	echo "Using ./videos/$$BASENAME"; \
-	$(MAKE) local-smoke VIDEO="/videos/videos/$$BASENAME" QUERY="$(or $(QUERY),budget roadmap)" ENDPOINT="$(or $(ENDPOINT),http://localhost:8080/mcp)"
+	$(MAKE) local-smoke VIDEO="/videos/videos/$$BASENAME" QUERY="$(or $(QUERY),test query)" ENDPOINT="$(or $(ENDPOINT),http://localhost:8080/mcp)"
 
 local-e2e: local-up local-smoke-default
 	@echo "Local MCP server is running at http://localhost:8080/mcp"

@@ -36,10 +36,21 @@ func run() error {
 		return fmt.Errorf("initialize store: %w", err)
 	}
 
-	ingester := ingestion.NewMockIngester(store, ingestion.IndexOptions{
+	indexOptions := ingestion.IndexOptions{
 		FrameIntervalSec: cfg.FrameIntervalSec,
 		Concurrency:      cfg.IndexConcurrency,
-	})
+	}
+
+	var ingester ingestion.Ingester
+	switch cfg.IngestionMode {
+	case config.IngestionModeSimulated:
+		ingester = ingestion.NewMockIngester(store, indexOptions)
+	case config.IngestionModeReal:
+		ingester = ingestion.NewRealIngester(store, indexOptions)
+	default:
+		return fmt.Errorf("unsupported ingestion mode: %s", cfg.IngestionMode)
+	}
+
 	orchestrator := ingestion.NewSyncIndexOrchestrator(ingester, store)
 	mcpSrv := mcpserver.New(serverName, serverVersion, orchestrator, store, cfg.DefaultSearchLimit, cfg.RuntimeMode, mcpserver.RankingOptions{
 		AudioWeight:  cfg.SearchAudioWeight,

@@ -22,10 +22,16 @@
 
 ### Deliverables
 
-- [ ] Add a capability matrix mapping Cloud Run concepts to Hetzner equivalents and constraints.
-- [ ] Produce a minimal production-ready Hetzner deployment runbook (single-node Docker first, K8s optional path).
-- [ ] Produce a matching Cloud Run runbook with equivalent operational checkpoints.
-- [ ] Define a parity validation checklist (index/search/list/transcript + persistence + restart behavior) that passes on both platforms.
+- [x] Add a capability matrix mapping Cloud Run concepts to Hetzner equivalents and constraints.
+- [x] Produce a minimal production-ready Hetzner deployment runbook (single-node Docker first, K8s optional path).
+- [x] Produce a matching Cloud Run runbook with equivalent operational checkpoints.
+- [x] Define a parity validation checklist (index/search/list/transcript + persistence + restart behavior) that passes on both platforms.
+
+### Execution Guardrail (Agreed)
+
+- [x] Phase 6 implementation work is timeboxed to planning/docs baseline only.
+- [x] No deep platform-specific build-out on Cloud Run/Hetzner until local semantic ingestion is satisfactory.
+- [x] Start execution with local semantic ingestion track before additional cloud platform expansion.
 
 ### Critical Near-Term Track (Address Next)
 
@@ -34,10 +40,11 @@
 
 ### Real Semantic Ingestion (Next Phase Candidate)
 
-- [ ] Add a configurable ingestion mode (`simulated` for tests/dev fixtures, `real` for actual content extraction) without breaking MCP contracts.
+- [x] Add a configurable ingestion mode (`simulated` for tests/dev fixtures, `real` for actual content extraction) without breaking MCP contracts.
+- [x] Implement interim real transcript path using sidecar transcript files (`.srt`, `.vtt`, `.txt`) in `real` mode for local quality validation.
 - [ ] Implement real transcription path from extracted audio (FFmpeg output) and persist transcript segments with source timestamps.
-- [ ] Implement real visual-context extraction path for keyframes (captioning or equivalent textual representation) and persist visual segments.
-- [ ] Ensure `search_video` uses real segment text/embeddings in `real` mode and keeps deterministic ordering guarantees.
+- [x] Implement real visual-context extraction path for keyframes (captioning or equivalent textual representation) and persist visual segments.
+- [x] Ensure `search_video` uses real segment text/embeddings in `real` mode and keeps deterministic ordering guarantees.
 - [ ] Add a retrieval-quality validation checklist using a known local clip with expected phrase/object queries.
 
 ### Real Semantic Ingestion — Acceptance Criteria

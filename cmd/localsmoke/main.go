@@ -14,7 +14,7 @@ import (
 func main() {
 	endpoint := flag.String("endpoint", "http://localhost:8080/mcp", "MCP streamable HTTP endpoint")
 	video := flag.String("video", "", "Video path visible to the server (e.g. /videos/demo.mp4)")
-	query := flag.String("query", "budget roadmap", "Search query")
+	query := flag.String("query", "test query", "Search query")
 	limit := flag.Int("limit", 5, "Search result limit")
 	flag.Parse()
 

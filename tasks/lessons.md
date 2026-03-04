@@ -104,3 +104,13 @@
 
 - **Treat Hetzner support as equal-priority to Cloud Run in planning.** For Europe-first customers, deployment location is a product requirement, not a later ops detail.
 - **Avoid Cloud-provider coupling in core runtime.** Keep provider differences in infra/runbooks while preserving identical MCP behavior and contracts.
+
+## 2026-03-04 — Local-First Execution Guardrail
+
+- **Do not over-invest in cloud platform engineering before local semantic quality is proven.** Keep Cloud Run/Hetzner work to parity planning/runbooks until real-content retrieval quality is satisfactory locally.
+- **Use local acceptance criteria as the gate.** Real transcript/visual grounding and query-quality checks should pass before deeper provider-specific rollout work.
+
+## 2026-03-04 — Real Mode Increment Strategy
+
+- **Add a low-risk real-mode slice before full ASR integration.** A sidecar transcript path (`.srt`/`.vtt`/`.txt`) allows immediate local semantic validation without blocking on model/runtime integration complexity.
+- **Keep deterministic testing defaults.** Preserve `simulated` mode as the default for repeatable integration tests while enabling `real` mode explicitly for quality checks.
