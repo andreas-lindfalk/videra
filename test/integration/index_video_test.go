@@ -1,0 +1,490 @@
+//go:build integration
+
+package integration
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	testcontainers "github.com/testcontainers/testcontainers-go"
+)
+
+type defaultIntegrationSuite struct {
+	suite.Suite
+
+	ctx context.Context
+	ctr testcontainers.Container
+	cli *client.Client
+}
+
+func TestDefaultIntegrationSuite(t *testing.T) {
+	suite.Run(t, &defaultIntegrationSuite{})
+}
+
+func (s *defaultIntegrationSuite) SetupSuite() {
+	s.ctx = context.Background()
+	s.ctr, s.cli = startVideraContainer(s.T(), s.ctx)
+}
+
+func (s *defaultIntegrationSuite) SetupTest() {
+	resetIndex(s.T(), s.ctx, s.cli)
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoSimulatedTranscription() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	indexResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/demo-video.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, indexResult.IsError)
+
+	structured, ok := indexResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+
+	videoID, ok := structured["videoId"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, videoID)
+	require.Equal(t, "indexed", structured["status"])
+	require.Contains(t, structured["modalities"], "visual")
+
+	listResult, err := cli.CallTool(ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_videos"}})
+	require.NoError(t, err)
+	require.False(t, listResult.IsError)
+
+	_, ok = listResult.StructuredContent.([]any)
+	require.True(t, ok)
+
+	resourceResult, err := cli.ReadResource(ctx, mcp.ReadResourceRequest{
+		Params: mcp.ReadResourceParams{URI: "video://" + videoID + "/transcript"},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resourceResult.Contents)
+
+	textContent, ok := mcp.AsTextResourceContents(resourceResult.Contents[0])
+	require.True(t, ok)
+	require.Contains(t, textContent.Text, "simulated")
+
+	searchResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_video",
+			Arguments: map[string]any{
+				"query": "budget and roadmap",
+				"limit": 5,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, searchResult.IsError)
+
+	searchPayload, ok := searchResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "budget and roadmap", searchPayload["query"])
+
+	rawResults, ok := searchPayload["results"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, rawResults)
+
+	hasAudio := false
+	hasVisual := false
+	for _, raw := range rawResults {
+		entry, ok := raw.(map[string]any)
+		require.True(t, ok)
+		segmentType, _ := entry["type"].(string)
+		if segmentType == "audio" {
+			hasAudio = true
+		}
+		if segmentType == "visual" {
+			hasVisual = true
+		}
+	}
+	require.True(t, hasAudio)
+	require.True(t, hasVisual)
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoInvalidPathReturnsToolError() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "/path/does/not/exist.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+	require.NotEmpty(t, result.Content)
+
+	text, ok := mcp.AsTextContent(result.Content[0])
+	require.True(t, ok)
+	require.Contains(t, text.Text, "not found")
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoIdempotentForSameSource() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	first, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/idempotent-demo.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, first.IsError)
+	firstPayload, ok := first.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	firstID, ok := firstPayload["videoId"].(string)
+	require.True(t, ok)
+
+	second, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/idempotent-demo.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, second.IsError)
+	secondPayload, ok := second.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	secondID, ok := secondPayload["videoId"].(string)
+	require.True(t, ok)
+
+	require.Equal(t, firstID, secondID)
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoMalformedInputReturnsToolError() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+	require.NotEmpty(t, result.Content)
+
+	text, ok := mcp.AsTextContent(result.Content[0])
+	require.True(t, ok)
+	require.Contains(t, text.Text, "path is required")
+}
+
+func (s *defaultIntegrationSuite) TestSearchVideoDeterministicOrdering() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	_, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/deterministic-order.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	first := searchAndExtractResults(t, ctx, cli, "budget and roadmap", 5)
+	second := searchAndExtractResults(t, ctx, cli, "budget and roadmap", 5)
+
+	require.Equal(t, first, second)
+	require.NotEmpty(t, first)
+}
+
+func (s *defaultIntegrationSuite) TestSearchVideoMalformedPayloadReturnsToolError() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_video",
+			Arguments: map[string]any{
+				"query": 123,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+	require.NotEmpty(t, result.Content)
+
+	text, ok := mcp.AsTextContent(result.Content[0])
+	require.True(t, ok)
+	require.Contains(t, text.Text, "query")
+}
+
+func (s *defaultIntegrationSuite) TestToolResponseBackwardCompatFields() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	indexResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/backward-compat.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, indexResult.IsError)
+
+	indexPayload, ok := indexResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, indexPayload, "videoId")
+	require.Contains(t, indexPayload, "status")
+	require.Contains(t, indexPayload, "filePath")
+	require.Contains(t, indexPayload, "audioSegments")
+	require.Contains(t, indexPayload, "visualSegments")
+	require.Contains(t, indexPayload, "modalities")
+
+	searchResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_video",
+			Arguments: map[string]any{
+				"query": "budget roadmap",
+				"limit": 3,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, searchResult.IsError)
+
+	searchPayload, ok := searchResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, searchPayload, "query")
+	require.Contains(t, searchPayload, "count")
+	require.Contains(t, searchPayload, "results")
+
+	rawResults, ok := searchPayload["results"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, rawResults)
+
+	firstResult, ok := rawResults[0].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, firstResult, "videoId")
+	require.Contains(t, firstResult, "startMs")
+	require.Contains(t, firstResult, "endMs")
+	require.Contains(t, firstResult, "type")
+	require.Contains(t, firstResult, "snippet")
+	require.Contains(t, firstResult, "similarity")
+
+	listResult, err := cli.CallTool(ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_videos"}})
+	require.NoError(t, err)
+	require.False(t, listResult.IsError)
+
+	videos, ok := listResult.StructuredContent.([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, videos)
+
+	firstVideo, ok := videos[0].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, firstVideo, "id")
+	require.Contains(t, firstVideo, "filePath")
+	require.Contains(t, firstVideo, "status")
+	require.Contains(t, firstVideo, "indexedAt")
+	require.Contains(t, firstVideo, "durationMs")
+	require.Contains(t, firstVideo, "audioSegments")
+	require.Contains(t, firstVideo, "visualSegments")
+	require.Contains(t, firstVideo, "modalities")
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoRetrySafeAfterPartialFailure() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	path := "https://example.com/retry-safe.mp4?videra_fail_after_persist_once=1"
+
+	first, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": path,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, first.IsError)
+
+	firstPayload, ok := first.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	firstID, ok := firstPayload["videoId"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, firstID)
+
+	second, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": path,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, second.IsError)
+
+	secondPayload, ok := second.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	secondID, ok := secondPayload["videoId"].(string)
+	require.True(t, ok)
+	require.Equal(t, firstID, secondID)
+
+	listResult, err := cli.CallTool(ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_videos"}})
+	require.NoError(t, err)
+	require.False(t, listResult.IsError)
+
+	videos, ok := listResult.StructuredContent.([]any)
+	require.True(t, ok)
+	require.Len(t, videos, 1)
+}
+
+type weightingIntegrationSuite struct {
+	suite.Suite
+
+	ctx          context.Context
+	audioFavCtr  testcontainers.Container
+	audioFavCli  *client.Client
+	visualFavCtr testcontainers.Container
+	visualFavCli *client.Client
+}
+
+func TestWeightingIntegrationSuite(t *testing.T) {
+	suite.Run(t, &weightingIntegrationSuite{})
+}
+
+func (s *weightingIntegrationSuite) SetupSuite() {
+	s.ctx = context.Background()
+
+	s.audioFavCtr, s.audioFavCli = startVideraContainerWithEnv(s.T(), s.ctx, map[string]string{
+		"VIDERA_SEARCH_AUDIO_WEIGHT":  "50.0",
+		"VIDERA_SEARCH_VISUAL_WEIGHT": "0.1",
+	})
+
+	s.visualFavCtr, s.visualFavCli = startVideraContainerWithEnv(s.T(), s.ctx, map[string]string{
+		"VIDERA_SEARCH_AUDIO_WEIGHT":  "0.1",
+		"VIDERA_SEARCH_VISUAL_WEIGHT": "50.0",
+	})
+}
+
+func (s *weightingIntegrationSuite) SetupTest() {
+	resetIndex(s.T(), s.ctx, s.audioFavCli)
+	resetIndex(s.T(), s.ctx, s.visualFavCli)
+}
+
+func (s *weightingIntegrationSuite) TestSearchVideoModalityWeightingBehavior() {
+	t := s.T()
+	ctx := s.ctx
+	audioFavCli := s.audioFavCli
+	visualFavCli := s.visualFavCli
+
+	_, err := audioFavCli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/modality-weighting.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	audioFavResults := searchAndExtractResults(t, ctx, audioFavCli, "roadmap budget keyframe", 5)
+	require.NotEmpty(t, audioFavResults)
+	audioFavVisualScore := topScoreForType(audioFavResults, "visual")
+	audioFavAudioScore := topScoreForType(audioFavResults, "audio")
+
+	_, err = visualFavCli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/modality-weighting.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	visualFavResults := searchAndExtractResults(t, ctx, visualFavCli, "roadmap budget keyframe", 5)
+	require.NotEmpty(t, visualFavResults)
+	visualFavVisualScore := topScoreForType(visualFavResults, "visual")
+	visualFavAudioScore := topScoreForType(visualFavResults, "audio")
+
+	require.Greater(t, visualFavVisualScore, audioFavVisualScore)
+	require.Greater(t, audioFavAudioScore, visualFavAudioScore)
+}
+
+func searchAndExtractResults(t *testing.T, ctx context.Context, cli *client.Client, query string, limit int) []map[string]any {
+	t.Helper()
+
+	searchResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_video",
+			Arguments: map[string]any{
+				"query": query,
+				"limit": limit,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, searchResult.IsError)
+
+	searchPayload, ok := searchResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+
+	rawResults, ok := searchPayload["results"].([]any)
+	require.True(t, ok)
+
+	out := make([]map[string]any, 0, len(rawResults))
+	for _, raw := range rawResults {
+		entry, ok := raw.(map[string]any)
+		require.True(t, ok)
+		out = append(out, entry)
+	}
+
+	return out
+}
+
+func topScoreForType(results []map[string]any, segmentType string) float64 {
+	max := -1.0
+	for _, result := range results {
+		typeValue := fmt.Sprintf("%v", result["type"])
+		if typeValue != segmentType {
+			continue
+		}
+
+		score, ok := result["similarity"].(float64)
+		if !ok {
+			continue
+		}
+		if score > max {
+			max = score
+		}
+	}
+	return max
+}

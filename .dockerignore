@@ -1,0 +1,8 @@
+.git
+.github
+tasks
+bin
+data
+*.log
+coverage.*
+*.out
