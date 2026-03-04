@@ -9,6 +9,7 @@ Privacy-native multimodal video memory MCP server in Go.
 - A new local `real` ingestion mode is available: `VIDERA_INGESTION_MODE=real` uses sidecar transcript files (`.srt`, `.vtt`, `.txt`) next to the video file.
 - In `real` mode, if no sidecar is found, Videra attempts FFmpeg audio extraction + Whisper CLI transcription (`whisper` or `python3 -m whisper`).
 - In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
+- `index_video` supports `mode=async` for non-blocking indexing; poll status via `get_index_job` using returned `jobId`.
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 - Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
@@ -139,6 +140,23 @@ For VS Code/Copilot MCP configuration, use the MCP server setup UI and provide e
 - a URL-based server endpoint (HTTP)
 
 Then verify by calling `list_videos` first.
+
+## Async Indexing Flow
+
+Use async mode when indexing should not block the MCP caller:
+
+1. Call `index_video` with `mode="async"`.
+2. Read returned `jobId`.
+3. Poll `get_index_job` with that `jobId` until `status` is `completed` or `failed`.
+
+Example initiation payload:
+
+```json
+{
+	"path": "https://example.com/meeting.mp4",
+	"mode": "async"
+}
+```
 
 ## Troubleshooting
 

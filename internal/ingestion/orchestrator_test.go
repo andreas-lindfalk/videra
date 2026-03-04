@@ -3,14 +3,18 @@ package ingestion
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/andreas-lindfalk/videra/internal/storage"
 	"github.com/stretchr/testify/require"
 )
 
 type fakeIngester struct {
+	mu      sync.Mutex
 	calls   int
+	delay   time.Duration
 	results []struct {
 		video storage.Video
 		err   error
@@ -18,15 +22,28 @@ type fakeIngester struct {
 }
 
 func (f *fakeIngester) IndexVideo(_ context.Context, _ string) (storage.Video, error) {
+	if f.delay > 0 {
+		time.Sleep(f.delay)
+	}
+
+	f.mu.Lock()
 	f.calls++
 	if len(f.results) == 0 {
+		f.mu.Unlock()
 		return storage.Video{}, errors.New("no fake result configured")
 	}
 	result := f.results[0]
 	if len(f.results) > 1 {
 		f.results = f.results[1:]
 	}
+	f.mu.Unlock()
 	return result.video, result.err
+}
+
+func (f *fakeIngester) Calls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
 }
 
 type fakeLookup struct {
@@ -53,7 +70,7 @@ func TestSyncIndexOrchestratorRunSyncCompleted(t *testing.T) {
 	require.Equal(t, req.JobID, result.JobID)
 	require.NotNil(t, result.Video)
 	require.Equal(t, "v1", result.Video.ID)
-	require.Equal(t, 1, ingester.calls)
+	require.Equal(t, 1, ingester.Calls())
 }
 
 func TestSyncIndexOrchestratorRunAsyncPending(t *testing.T) {
@@ -61,7 +78,7 @@ func TestSyncIndexOrchestratorRunAsyncPending(t *testing.T) {
 	ingester := &fakeIngester{results: []struct {
 		video storage.Video
 		err   error
-	}{{video: storage.Video{ID: "v1"}}}}
+	}{{video: storage.Video{ID: "v1"}}}, delay: 80 * time.Millisecond}
 	orchestrator := NewSyncIndexOrchestrator(ingester, lookup)
 	req := NewIndexJobRequest("https://example.com/v1.mp4", IndexModeAsync)
 
@@ -70,7 +87,16 @@ func TestSyncIndexOrchestratorRunAsyncPending(t *testing.T) {
 	require.Equal(t, IndexJobStatusPending, result.Status)
 	require.Equal(t, req.JobID, result.JobID)
 	require.Nil(t, result.Video)
-	require.Equal(t, 0, ingester.calls)
+
+	stored, ok := orchestrator.GetJob(context.Background(), req.JobID)
+	require.True(t, ok)
+	require.Equal(t, IndexJobStatusPending, stored.Status)
+
+	require.Eventually(t, func() bool {
+		job, found := orchestrator.GetJob(context.Background(), req.JobID)
+		return found && job.Status == IndexJobStatusCompleted && job.Video != nil
+	}, 2*time.Second, 20*time.Millisecond)
+	require.Equal(t, 1, ingester.Calls())
 }
 
 func TestSyncIndexOrchestratorRunRetriesAndSucceeds(t *testing.T) {
@@ -90,7 +116,7 @@ func TestSyncIndexOrchestratorRunRetriesAndSucceeds(t *testing.T) {
 	require.Equal(t, IndexJobStatusCompleted, result.Status)
 	require.NotNil(t, result.Video)
 	require.Equal(t, "v1", result.Video.ID)
-	require.Equal(t, 2, ingester.calls)
+	require.Equal(t, 2, ingester.Calls())
 }
 
 func TestSyncIndexOrchestratorRunPartialFailureRecoveryFromLookup(t *testing.T) {
@@ -136,7 +162,7 @@ func TestSyncIndexOrchestratorRunPersistentFailureStatus(t *testing.T) {
 	require.Equal(t, IndexJobStatusFailed, result.Status)
 	require.Equal(t, "boom-2", result.Error)
 	require.Nil(t, result.Video)
-	require.Equal(t, 2, ingester.calls)
+	require.Equal(t, 2, ingester.Calls())
 }
 
 func TestSyncIndexOrchestratorRunExistingShortCircuits(t *testing.T) {
@@ -155,5 +181,37 @@ func TestSyncIndexOrchestratorRunExistingShortCircuits(t *testing.T) {
 	require.Equal(t, IndexJobStatusCompleted, result.Status)
 	require.NotNil(t, result.Video)
 	require.Equal(t, existing.ID, result.Video.ID)
-	require.Equal(t, 0, ingester.calls)
+	require.Equal(t, 0, ingester.Calls())
+}
+
+func TestSyncIndexOrchestratorGetJobUnknown(t *testing.T) {
+	lookup := &fakeLookup{videos: map[string]storage.Video{}}
+	ingester := &fakeIngester{results: []struct {
+		video storage.Video
+		err   error
+	}{{video: storage.Video{ID: "v1"}}}}
+	orchestrator := NewSyncIndexOrchestrator(ingester, lookup)
+
+	_, ok := orchestrator.GetJob(context.Background(), "missing")
+	require.False(t, ok)
+}
+
+func TestSyncIndexOrchestratorRunAsyncFailurePersistsStatus(t *testing.T) {
+	lookup := &fakeLookup{videos: map[string]storage.Video{}}
+	ingester := &fakeIngester{results: []struct {
+		video storage.Video
+		err   error
+	}{{err: errors.New("boom")}}}
+	orchestrator := NewSyncIndexOrchestrator(ingester, lookup)
+	req := NewIndexJobRequest("/missing/video.mp4", IndexModeAsync)
+
+	result, err := orchestrator.Run(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, IndexJobStatusPending, result.Status)
+
+	require.Eventually(t, func() bool {
+		job, ok := orchestrator.GetJob(context.Background(), req.JobID)
+		return ok && job.Status == IndexJobStatusFailed && job.Error == "boom"
+	}, 2*time.Second, 20*time.Millisecond)
+	require.Equal(t, 2, ingester.Calls())
 }

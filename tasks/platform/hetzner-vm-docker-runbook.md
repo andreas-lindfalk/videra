@@ -161,8 +161,20 @@ Then run MCP checks:
 2. `index_video` with either:
   - server-visible path (example: `/videos/IMG_3711.MOV`), or
   - remote HTTP(S) URL (for cloud/object-storage parity checks)
-3. `search_video` with a test query
-4. `read_resource` for `video://<videoId>/transcript`
+3. `get_index_job` polling if `index_video` is started with `mode=async`
+4. `search_video` with a test query
+5. `read_resource` for `video://<videoId>/transcript`
+
+Async payload example:
+
+```json
+{
+  "path": "/videos/IMG_3711.MOV",
+  "mode": "async"
+}
+```
+
+When async mode is used, poll `get_index_job` with returned `jobId` until status is `completed` or `failed`.
 
 If indexing local file from VM, upload file first:
 

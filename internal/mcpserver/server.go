@@ -75,6 +75,10 @@ func (s *Server) registerTools() {
 			mcp.Required(),
 			mcp.Description("Local path or URL to the video"),
 		),
+		mcp.WithString(
+			"mode",
+			mcp.Description("Indexing mode: sync (default) or async"),
+		),
 	)
 
 	s.mcp.AddTool(indexVideoTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -83,7 +87,12 @@ func (s *Server) registerTools() {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		job := ingestion.NewIndexJobRequest(path, ingestion.IndexModeSync)
+		mode, err := parseIndexMode(req)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		job := ingestion.NewIndexJobRequest(path, mode)
 		result, err := s.orchestrator.Run(ctx, job)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
@@ -91,6 +100,17 @@ func (s *Server) registerTools() {
 		if result.Status == ingestion.IndexJobStatusFailed {
 			return mcp.NewToolResultError(result.Error), nil
 		}
+
+		if mode == ingestion.IndexModeAsync && result.Status == ingestion.IndexJobStatusPending {
+			payload := map[string]any{
+				"jobId":  result.JobID,
+				"status": result.Status,
+				"mode":   string(mode),
+				"path":   strings.TrimSpace(path),
+			}
+			return mcp.NewToolResultStructured(payload, fmt.Sprintf("scheduled indexing job %s", result.JobID)), nil
+		}
+
 		if result.Video == nil {
 			return mcp.NewToolResultError("indexing did not produce a video"), nil
 		}
@@ -105,8 +125,53 @@ func (s *Server) registerTools() {
 			"visualSegments": video.VisualSegments,
 			"modalities":     video.Modalities,
 			"jobId":          result.JobID,
+			"mode":           string(mode),
 		}
 		return mcp.NewToolResultStructured(payload, fmt.Sprintf("indexed video %s", video.ID)), nil
+	})
+
+	getIndexJobTool := mcp.NewTool(
+		"get_index_job",
+		mcp.WithDescription("Returns status for an indexing job started by index_video in async mode."),
+		mcp.WithString(
+			"jobId",
+			mcp.Required(),
+			mcp.Description("Index job ID returned by index_video"),
+		),
+	)
+
+	s.mcp.AddTool(getIndexJobTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		jobID, err := req.RequireString("jobId")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		reader, ok := s.orchestrator.(ingestion.IndexJobReader)
+		if !ok {
+			return mcp.NewToolResultError("index job status lookup is not supported by current orchestrator"), nil
+		}
+
+		result, found := reader.GetJob(ctx, jobID)
+		if !found {
+			return mcp.NewToolResultError(fmt.Sprintf("index job not found: %s", strings.TrimSpace(jobID))), nil
+		}
+
+		payload := map[string]any{
+			"jobId":  result.JobID,
+			"status": result.Status,
+		}
+		if result.Error != "" {
+			payload["error"] = result.Error
+		}
+		if result.Video != nil {
+			payload["videoId"] = result.Video.ID
+			payload["filePath"] = result.Video.FilePath
+			payload["audioSegments"] = result.Video.AudioSegments
+			payload["visualSegments"] = result.Video.VisualSegments
+			payload["modalities"] = result.Video.Modalities
+		}
+
+		return mcp.NewToolResultStructured(payload, fmt.Sprintf("index job %s is %s", result.JobID, result.Status)), nil
 	})
 
 	searchVideoTool := mcp.NewTool(
@@ -349,4 +414,31 @@ func weightedScore(result storage.SearchResult, ranking RankingOptions) float64 
 		return base * ranking.VisualWeight
 	}
 	return base * ranking.AudioWeight
+}
+
+func parseIndexMode(req mcp.CallToolRequest) (ingestion.IndexMode, error) {
+	arguments, ok := req.Params.Arguments.(map[string]any)
+	if !ok || arguments == nil {
+		return ingestion.IndexModeSync, nil
+	}
+
+	rawMode, hasMode := arguments["mode"]
+	if !hasMode || rawMode == nil {
+		return ingestion.IndexModeSync, nil
+	}
+
+	modeValue, ok := rawMode.(string)
+	if !ok {
+		return "", fmt.Errorf("mode must be a string")
+	}
+
+	normalizedMode := ingestion.IndexMode(strings.ToLower(strings.TrimSpace(modeValue)))
+	switch normalizedMode {
+	case "", ingestion.IndexModeSync:
+		return ingestion.IndexModeSync, nil
+	case ingestion.IndexModeAsync:
+		return ingestion.IndexModeAsync, nil
+	default:
+		return "", fmt.Errorf("unsupported mode: %s", modeValue)
+	}
 }

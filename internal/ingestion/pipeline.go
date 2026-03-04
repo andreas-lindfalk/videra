@@ -74,6 +74,10 @@ type IndexOrchestrator interface {
 	Run(ctx context.Context, req IndexJobRequest) (IndexJobResult, error)
 }
 
+type IndexJobReader interface {
+	GetJob(ctx context.Context, jobID string) (IndexJobResult, bool)
+}
+
 type SourceVideoLookup interface {
 	GetVideoBySourcePath(ctx context.Context, sourcePath string) (storage.Video, bool)
 }

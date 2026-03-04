@@ -107,8 +107,9 @@ Run checks:
 
 1. `list_videos`
 2. `index_video` using remote HTTP(S) media URL
-3. `search_video`
-4. `read_resource` for `video://<id>/transcript` (if indexed data exists)
+3. `get_index_job` polling if `index_video` was started with `mode=async`
+4. `search_video`
+5. `read_resource` for `video://<id>/transcript` (if indexed data exists)
 
 ## 7) Cloud-ready indexing path (Phase 8)
 
@@ -124,6 +125,17 @@ Example MCP call payload:
   "path": "https://storage.example.com/videra/meeting-123.mp4?signature=..."
 }
 ```
+
+Async initiation payload variant:
+
+```json
+{
+  "path": "https://storage.example.com/videra/meeting-123.mp4?signature=...",
+  "mode": "async"
+}
+```
+
+When async mode is used, poll `get_index_job` with returned `jobId` until terminal status (`completed` or `failed`).
 
 Bounded fetch behavior is controlled by:
 

@@ -3,16 +3,21 @@ package ingestion
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 )
 
 type SyncIndexOrchestrator struct {
 	ingester    Ingester
 	lookup      SourceVideoLookup
 	maxAttempts int
+
+	mu   sync.RWMutex
+	jobs map[string]IndexJobResult
 }
 
 func NewSyncIndexOrchestrator(ingester Ingester, lookup SourceVideoLookup) *SyncIndexOrchestrator {
-	return &SyncIndexOrchestrator{ingester: ingester, lookup: lookup, maxAttempts: 2}
+	return &SyncIndexOrchestrator{ingester: ingester, lookup: lookup, maxAttempts: 2, jobs: map[string]IndexJobResult{}}
 }
 
 func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (IndexJobResult, error) {
@@ -28,26 +33,65 @@ func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (I
 	if req.Mode == "" {
 		req.Mode = IndexModeSync
 	}
+	req.Path = strings.TrimSpace(req.Path)
 	if req.Path == "" {
 		return IndexJobResult{}, fmt.Errorf("path is required")
 	}
 	if existing, ok := o.lookup.GetVideoBySourcePath(ctx, req.Path); ok {
-		return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &existing}, nil
+		result := IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &existing}
+		o.setJob(result)
+		return result, nil
 	}
 
 	if req.Mode == IndexModeAsync {
-		return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusPending}, nil
+		pending := IndexJobResult{JobID: req.JobID, Status: IndexJobStatusPending}
+		o.setJob(pending)
+		go o.runAsync(req)
+		return pending, nil
+	}
+
+	result := o.runSync(ctx, req)
+	o.setJob(result)
+	return result, nil
+}
+
+func (o *SyncIndexOrchestrator) GetJob(_ context.Context, jobID string) (IndexJobResult, bool) {
+	trimmedJobID := strings.TrimSpace(jobID)
+	if trimmedJobID == "" {
+		return IndexJobResult{}, false
+	}
+
+	o.mu.RLock()
+	result, ok := o.jobs[trimmedJobID]
+	o.mu.RUnlock()
+	if !ok {
+		return IndexJobResult{}, false
+	}
+
+	return cloneJobResult(result), true
+}
+
+func (o *SyncIndexOrchestrator) runAsync(req IndexJobRequest) {
+	job := req
+	job.Mode = IndexModeSync
+	result := o.runSync(context.Background(), job)
+	o.setJob(result)
+}
+
+func (o *SyncIndexOrchestrator) runSync(ctx context.Context, req IndexJobRequest) IndexJobResult {
+	if existing, ok := o.lookup.GetVideoBySourcePath(ctx, req.Path); ok {
+		return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &existing}
 	}
 
 	var lastErr error
 	for attempt := 1; attempt <= o.maxAttempts; attempt++ {
 		video, err := o.ingester.IndexVideo(ctx, req.Path)
 		if err == nil {
-			return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &video}, nil
+			return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &video}
 		}
 
 		if existing, ok := o.lookup.GetVideoBySourcePath(ctx, req.Path); ok {
-			return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &existing}, nil
+			return IndexJobResult{JobID: req.JobID, Status: IndexJobStatusCompleted, Video: &existing}
 		}
 
 		lastErr = err
@@ -57,7 +101,30 @@ func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (I
 		JobID:  req.JobID,
 		Status: IndexJobStatusFailed,
 		Error:  lastErr.Error(),
-	}, nil
+	}
+}
+
+func (o *SyncIndexOrchestrator) setJob(result IndexJobResult) {
+	if strings.TrimSpace(result.JobID) == "" {
+		return
+	}
+
+	o.mu.Lock()
+	if o.jobs == nil {
+		o.jobs = map[string]IndexJobResult{}
+	}
+	o.jobs[result.JobID] = cloneJobResult(result)
+	o.mu.Unlock()
+}
+
+func cloneJobResult(result IndexJobResult) IndexJobResult {
+	cloned := result
+	if result.Video != nil {
+		copiedVideo := *result.Video
+		cloned.Video = &copiedVideo
+	}
+	return cloned
 }
 
 var _ IndexOrchestrator = (*SyncIndexOrchestrator)(nil)
+var _ IndexJobReader = (*SyncIndexOrchestrator)(nil)

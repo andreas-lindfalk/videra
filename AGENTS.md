@@ -99,6 +99,8 @@ When testing remote-source ingestion behavior in integration tests:
 - **GPU indexing path:** Design ingestion boundaries so Whisper/CLIP workloads can later run on GPU-backed jobs without changing MCP interfaces.
 - **Storage portability:** Keep storage abstraction so local Docker and cloud backends can share the same domain logic.
 - **Dual deployment modes:** Maintain both self-hosted (on-prem/local Docker) and SaaS deployment paths from the same codebase.
+- **Queue portability path:** Keep async orchestration broker-agnostic; default to in-process execution first, with NATS/JetStream as the first candidate when external queueing is introduced.
+- **Vendor decision checkpoint:** Before implementing any vendor-specific backend, run an explicit architecture checkpoint comparing at least one neutral/self-hosted alternative and document lock-in impact.
 - **Protocol-native gateway expectations:** Plan for AgentGateway-native capabilities including MCP federation, JWT/RBAC/CEL policy controls, and observability at the edge.
 
 Reference:
@@ -114,6 +116,8 @@ Reference:
 - Favor idempotent indexing operations and explicit job boundaries to fit async execution models on both Cloud Run and Hetzner-based schedulers.
 - Keep MCP transport compatibility for federation patterns (stdio/SSE/streamable HTTP) expected by AgentGateway MCP integrations.
 - Keep ingestion source contract parity: local paths remain supported, and cloud parity indexing should use remote HTTP(S) sources with bounded fetch controls.
+- Keep queueing concerns behind interface boundaries (for example `JobQueue`) so private deployments can run in-process or with a self-hosted broker without MCP API changes.
+- Do not merge vendor-specific integrations without a documented fallback/portability path for private deployments.
 
 ## Change Hygiene (Agent Workflow)
 

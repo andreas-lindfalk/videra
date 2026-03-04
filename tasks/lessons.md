@@ -130,3 +130,14 @@
 - **Preserve idempotency via source identity, not temp-file identity.** For remote ingestion, keep the original URL as `sourcePath` while processing a fetched temporary file so retries remain deterministic.
 - **Bounded fetch controls are a deployment contract.** Keep timeout and max payload size explicit (`VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`) to avoid environment-dependent failures.
 - **Containerized remote-fetch integration is deterministic with host-port exposure.** Exposing host test fixture ports to integration containers enables reliable verification of remote error paths (e.g., oversize payload).
+
+## 2026-03-04 — Vendor Lock-In Guardrail
+
+- **Run a vendor decision checkpoint before implementation.** For any vendor-specific backend choice, compare at least one neutral/self-hosted alternative first.
+- **Require a portability path up front.** Do not adopt vendor-specific infrastructure without documenting fallback options for private/self-hosted deployments.
+
+## 2026-03-04 — Async Job Lifecycle Contract
+
+- **Keep async initiation and status lookup explicitly separate.** `index_video` should return quickly in async mode with `jobId`, while `get_index_job` owns lifecycle polling (`pending` → `completed`/`failed`).
+- **Preserve sync defaults for compatibility.** Existing clients should continue to get blocking `index_video` behavior unless they opt into `mode=async`.
+- **Make failure semantics observable and deterministic.** Background failures should always persist to job state with explicit error strings rather than disappearing in logs.

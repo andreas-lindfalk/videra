@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/andreas-lindfalk/videra/internal/proofpack"
 	"github.com/mark3labs/mcp-go/client"
@@ -196,6 +197,116 @@ func (s *defaultIntegrationSuite) TestIndexVideoMalformedInputReturnsToolError()
 	text, ok := mcp.AsTextContent(result.Content[0])
 	require.True(t, ok)
 	require.Contains(t, text.Text, "path is required")
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoAsyncLifecycleSuccess() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	initResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/async-success.mp4",
+				"mode": "async",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, initResult.IsError)
+
+	initPayload, ok := initResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "pending", initPayload["status"])
+	jobID, ok := initPayload["jobId"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, jobID)
+
+	jobPayload := pollIndexJobStatus(t, ctx, cli, jobID, "completed")
+	require.Equal(t, "completed", jobPayload["status"])
+	videoID, ok := jobPayload["videoId"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, videoID)
+
+	listResult, err := cli.CallTool(ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_videos"}})
+	require.NoError(t, err)
+	require.False(t, listResult.IsError)
+	videos, ok := listResult.StructuredContent.([]any)
+	require.True(t, ok)
+	require.Len(t, videos, 1)
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoAsyncLifecycleFailure() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	initResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "/path/does/not/exist-async.mp4",
+				"mode": "async",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, initResult.IsError)
+
+	initPayload, ok := initResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	jobID, ok := initPayload["jobId"].(string)
+	require.True(t, ok)
+
+	jobPayload := pollIndexJobStatus(t, ctx, cli, jobID, "failed")
+	require.Equal(t, "failed", jobPayload["status"])
+	errorMessage, ok := jobPayload["error"].(string)
+	require.True(t, ok)
+	require.Contains(t, errorMessage, "not found")
+}
+
+func (s *defaultIntegrationSuite) TestIndexVideoInvalidModeReturnsToolError() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/invalid-mode.mp4",
+				"mode": "queue",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+
+	text, ok := mcp.AsTextContent(result.Content[0])
+	require.True(t, ok)
+	require.Contains(t, text.Text, "unsupported mode")
+}
+
+func (s *defaultIntegrationSuite) TestGetIndexJobUnknownReturnsToolError() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "get_index_job",
+			Arguments: map[string]any{
+				"jobId": "missing-job-id",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+
+	text, ok := mcp.AsTextContent(result.Content[0])
+	require.True(t, ok)
+	require.Contains(t, text.Text, "index job not found")
 }
 
 func (s *defaultIntegrationSuite) TestIndexVideoLocalFileLikePathFlow() {
@@ -651,4 +762,35 @@ func evidenceMatches(results []map[string]any, expected []string) int {
 		}
 	}
 	return matches
+}
+
+func pollIndexJobStatus(t *testing.T, ctx context.Context, cli *client.Client, jobID string, expectedStatus string) map[string]any {
+	t.Helper()
+
+	var latestPayload map[string]any
+	require.Eventually(t, func() bool {
+		result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "get_index_job",
+				Arguments: map[string]any{
+					"jobId": jobID,
+				},
+			},
+		})
+		if err != nil || result.IsError {
+			return false
+		}
+
+		payload, ok := result.StructuredContent.(map[string]any)
+		if !ok {
+			return false
+		}
+		latestPayload = payload
+
+		status, _ := payload["status"].(string)
+		return status == expectedStatus
+	}, 3*time.Second, 25*time.Millisecond)
+
+	require.NotNil(t, latestPayload)
+	return latestPayload
 }
