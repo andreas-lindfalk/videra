@@ -126,6 +126,9 @@ Reference:
   - `tasks/platform/env-contract.md`
   - relevant deployment runbooks under `tasks/platform/`
 - If ingestion behavior changes, update both focused unit tests and at least one integration scenario proving the contract.
+- If queue/backplane architecture is under consideration, update/check these checkpoint artifacts before implementation:
+  - `tasks/platform/queue-vendor-checkpoint.md`
+  - `tasks/platform/jobqueue-interface-proposal.md`
 
 ## Hetzner Equivalency Note
 

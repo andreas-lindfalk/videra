@@ -141,3 +141,8 @@
 - **Keep async initiation and status lookup explicitly separate.** `index_video` should return quickly in async mode with `jobId`, while `get_index_job` owns lifecycle polling (`pending` → `completed`/`failed`).
 - **Preserve sync defaults for compatibility.** Existing clients should continue to get blocking `index_video` behavior unless they opt into `mode=async`.
 - **Make failure semantics observable and deterministic.** Background failures should always persist to job state with explicit error strings rather than disappearing in logs.
+
+## 2026-03-04 — Queue Decision Discipline
+
+- **Finalize decision artifacts before adapter implementation.** A vendor checkpoint matrix + interface proposal sharply reduces lock-in drift and prevents premature broker coupling.
+- **Treat go/no-go criteria as implementation gates.** Queue rollout should start only after reproducible evidence covers retry semantics, operational path, and rollback to in-process mode.
