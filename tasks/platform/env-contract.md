@@ -24,6 +24,31 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_REMOTE_FETCH_TIMEOUT_SEC` (default `60`)
 - `VIDERA_REMOTE_FETCH_MAX_MB` (default `200`)
 
+## Async Queue Backend Contract (Phase 11 Spike)
+
+- `VIDERA_JOBQUEUE_BACKEND` (`inprocess|nats|redis`, default `inprocess`)
+
+NATS JetStream options:
+
+- `VIDERA_JOBQUEUE_NATS_URL` (default `nats://127.0.0.1:4222`)
+- `VIDERA_JOBQUEUE_NATS_STREAM` (default `videra_index_jobs`)
+- `VIDERA_JOBQUEUE_NATS_SUBJECT` (default `videra.index.jobs`)
+- `VIDERA_JOBQUEUE_NATS_CONSUMER` (default `videra-index-worker`)
+
+Redis Streams options:
+
+- `VIDERA_JOBQUEUE_REDIS_ADDR` (default `127.0.0.1:6379`)
+- `VIDERA_JOBQUEUE_REDIS_PASSWORD` (default empty)
+- `VIDERA_JOBQUEUE_REDIS_DB` (default `0`)
+- `VIDERA_JOBQUEUE_REDIS_STREAM` (default `videra:index:jobs`)
+- `VIDERA_JOBQUEUE_REDIS_GROUP` (default `videra-index-workers`)
+- `VIDERA_JOBQUEUE_REDIS_CONSUMER` (default `videra-index-worker`)
+
+Notes:
+
+- Queue payloads are lightweight job instructions (`jobId`, source reference, attempts), not media bytes.
+- Default behavior remains `inprocess`; external backends are non-default spike paths.
+
 Notes:
 - In `real` mode, ingestion first looks for sidecar transcript files (`.srt`/`.vtt`/`.txt`).
 - If no sidecar is found, it attempts FFmpeg audio extraction + Whisper CLI transcription.

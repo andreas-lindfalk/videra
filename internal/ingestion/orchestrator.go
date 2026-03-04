@@ -10,6 +10,7 @@ import (
 type SyncIndexOrchestrator struct {
 	ingester    Ingester
 	lookup      SourceVideoLookup
+	queue       JobQueue
 	maxAttempts int
 
 	mu   sync.RWMutex
@@ -17,7 +18,15 @@ type SyncIndexOrchestrator struct {
 }
 
 func NewSyncIndexOrchestrator(ingester Ingester, lookup SourceVideoLookup) *SyncIndexOrchestrator {
-	return &SyncIndexOrchestrator{ingester: ingester, lookup: lookup, maxAttempts: 2, jobs: map[string]IndexJobResult{}}
+	return NewSyncIndexOrchestratorWithQueue(ingester, lookup, NewInProcessJobQueue(128))
+}
+
+func NewSyncIndexOrchestratorWithQueue(ingester Ingester, lookup SourceVideoLookup, queue JobQueue) *SyncIndexOrchestrator {
+	if queue == nil {
+		queue = NewInProcessJobQueue(128)
+	}
+
+	return &SyncIndexOrchestrator{ingester: ingester, lookup: lookup, queue: queue, maxAttempts: 2, jobs: map[string]IndexJobResult{}}
 }
 
 func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (IndexJobResult, error) {
@@ -26,6 +35,9 @@ func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (I
 	}
 	if o.lookup == nil {
 		return IndexJobResult{}, fmt.Errorf("source lookup is required")
+	}
+	if o.queue == nil {
+		o.queue = NewInProcessJobQueue(128)
 	}
 	if o.maxAttempts <= 0 {
 		o.maxAttempts = 1
@@ -44,9 +56,14 @@ func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (I
 	}
 
 	if req.Mode == IndexModeAsync {
+		envelope := jobEnvelopeFromRequest(req)
+		if err := o.queue.Enqueue(ctx, envelope); err != nil {
+			return IndexJobResult{}, err
+		}
+
 		pending := IndexJobResult{JobID: req.JobID, Status: IndexJobStatusPending}
 		o.setJob(pending)
-		go o.runAsync(req)
+		go o.processNextQueuedJob()
 		return pending, nil
 	}
 
@@ -71,11 +88,23 @@ func (o *SyncIndexOrchestrator) GetJob(_ context.Context, jobID string) (IndexJo
 	return cloneJobResult(result), true
 }
 
-func (o *SyncIndexOrchestrator) runAsync(req IndexJobRequest) {
-	job := req
-	job.Mode = IndexModeSync
-	result := o.runSync(context.Background(), job)
+func (o *SyncIndexOrchestrator) processNextQueuedJob() {
+	queued, lease, ok, err := o.queue.Reserve(context.Background(), 0)
+	if err != nil || !ok {
+		return
+	}
+
+	request := requestFromJobEnvelope(queued)
+	request.Mode = IndexModeSync
+	result := o.runSync(context.Background(), request)
 	o.setJob(result)
+
+	if result.Status == IndexJobStatusFailed {
+		_ = o.queue.Fail(context.Background(), lease, result.Error)
+		return
+	}
+
+	_ = o.queue.Ack(context.Background(), lease)
 }
 
 func (o *SyncIndexOrchestrator) runSync(ctx context.Context, req IndexJobRequest) IndexJobResult {
@@ -124,6 +153,25 @@ func cloneJobResult(result IndexJobResult) IndexJobResult {
 		cloned.Video = &copiedVideo
 	}
 	return cloned
+}
+
+func jobEnvelopeFromRequest(req IndexJobRequest) JobEnvelope {
+	return JobEnvelope{
+		JobID:       req.JobID,
+		SourcePath:  req.Path,
+		RequestedAt: req.RequestedAt,
+		Attempt:     0,
+		MaxAttempts: 2,
+	}
+}
+
+func requestFromJobEnvelope(job JobEnvelope) IndexJobRequest {
+	return IndexJobRequest{
+		JobID:       job.JobID,
+		Path:        job.SourcePath,
+		RequestedAt: job.RequestedAt,
+		Mode:        IndexModeAsync,
+	}
 }
 
 var _ IndexOrchestrator = (*SyncIndexOrchestrator)(nil)

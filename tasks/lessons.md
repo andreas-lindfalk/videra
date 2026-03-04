@@ -146,3 +146,18 @@
 
 - **Finalize decision artifacts before adapter implementation.** A vendor checkpoint matrix + interface proposal sharply reduces lock-in drift and prevents premature broker coupling.
 - **Treat go/no-go criteria as implementation gates.** Queue rollout should start only after reproducible evidence covers retry semantics, operational path, and rollback to in-process mode.
+
+## 2026-03-04 — Queue Adapter Baseline Implementation
+
+- **Build queue contracts before vendor adapters.** A shared `JobQueue` contract test suite catches lifecycle semantic drift (`enqueue/reserve/ack/retry/fail`) before introducing broker-specific complexity.
+- **Keep async API behavior stable during internal rewiring.** Routing async orchestration through an in-process queue can preserve `index_video`/`get_index_job` compatibility when integration tests are run end-to-end.
+
+## 2026-03-04 — Queue Payload Discipline
+
+- **Queue instructions, not media bytes.** Async backplanes should carry compact job metadata (`jobId`, source reference, attempts), while workers fetch media from shared-access sources.
+- **Distributed scaling requires shared source reachability.** Local node paths are fine for in-process/local mode, but multi-worker queue mode needs URLs or shared mounts visible to all workers.
+
+## 2026-03-04 — Queue Backend Consolidation Heuristic
+
+- **Prefer fewer moving parts when capabilities overlap.** If Redis is already required for key/value workloads, Redis Streams can be the pragmatic first queue backend to reduce operational surface area.
+- **Keep portability through shared queue contracts.** Even when choosing Redis for consolidation, maintain parity-tested adapters so NATS remains a viable fallback path.

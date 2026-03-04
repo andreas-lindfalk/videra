@@ -20,39 +20,69 @@ const (
 	IngestionModeReal      IngestionMode = "real"
 )
 
+type JobQueueBackend string
+
+const (
+	JobQueueBackendInProcess JobQueueBackend = "inprocess"
+	JobQueueBackendNATS      JobQueueBackend = "nats"
+	JobQueueBackendRedis     JobQueueBackend = "redis"
+)
+
 type Config struct {
-	Transport          Transport
-	HTTPAddr           string
-	DataDir            string
-	LogLevel           string
-	RuntimeMode        string
-	IngestionMode      IngestionMode
-	RemoteFetchEnabled bool
-	RemoteFetchTimeout int
-	RemoteFetchMaxMB   int
-	FrameIntervalSec   int
-	DefaultSearchLimit int
-	IndexConcurrency   int
-	SearchAudioWeight  float64
-	SearchVisualWeight float64
+	Transport             Transport
+	HTTPAddr              string
+	DataDir               string
+	LogLevel              string
+	RuntimeMode           string
+	IngestionMode         IngestionMode
+	RemoteFetchEnabled    bool
+	RemoteFetchTimeout    int
+	RemoteFetchMaxMB      int
+	FrameIntervalSec      int
+	DefaultSearchLimit    int
+	IndexConcurrency      int
+	SearchAudioWeight     float64
+	SearchVisualWeight    float64
+	JobQueueBackend       JobQueueBackend
+	JobQueueNATSURL       string
+	JobQueueNATSStream    string
+	JobQueueNATSSubject   string
+	JobQueueNATSConsumer  string
+	JobQueueRedisAddr     string
+	JobQueueRedisPassword string
+	JobQueueRedisDB       int
+	JobQueueRedisStream   string
+	JobQueueRedisGroup    string
+	JobQueueRedisConsumer string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Transport:          TransportStdio,
-		HTTPAddr:           ":8080",
-		DataDir:            "./data",
-		LogLevel:           "info",
-		RuntimeMode:        "local",
-		IngestionMode:      IngestionModeSimulated,
-		RemoteFetchEnabled: true,
-		RemoteFetchTimeout: 60,
-		RemoteFetchMaxMB:   200,
-		FrameIntervalSec:   5,
-		DefaultSearchLimit: 5,
-		IndexConcurrency:   4,
-		SearchAudioWeight:  1.0,
-		SearchVisualWeight: 1.0,
+		Transport:             TransportStdio,
+		HTTPAddr:              ":8080",
+		DataDir:               "./data",
+		LogLevel:              "info",
+		RuntimeMode:           "local",
+		IngestionMode:         IngestionModeSimulated,
+		RemoteFetchEnabled:    true,
+		RemoteFetchTimeout:    60,
+		RemoteFetchMaxMB:      200,
+		FrameIntervalSec:      5,
+		DefaultSearchLimit:    5,
+		IndexConcurrency:      4,
+		SearchAudioWeight:     1.0,
+		SearchVisualWeight:    1.0,
+		JobQueueBackend:       JobQueueBackendInProcess,
+		JobQueueNATSURL:       "nats://127.0.0.1:4222",
+		JobQueueNATSStream:    "videra_index_jobs",
+		JobQueueNATSSubject:   "videra.index.jobs",
+		JobQueueNATSConsumer:  "videra-index-worker",
+		JobQueueRedisAddr:     "127.0.0.1:6379",
+		JobQueueRedisPassword: "",
+		JobQueueRedisDB:       0,
+		JobQueueRedisStream:   "videra:index:jobs",
+		JobQueueRedisGroup:    "videra-index-workers",
+		JobQueueRedisConsumer: "videra-index-worker",
 	}
 
 	if value, ok := os.LookupEnv("VIDERA_TRANSPORT"); ok {
@@ -119,6 +149,41 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("invalid VIDERA_SEARCH_VISUAL_WEIGHT: %w", err)
 		}
 	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_BACKEND"); ok {
+		cfg.JobQueueBackend = JobQueueBackend(strings.ToLower(strings.TrimSpace(value)))
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_NATS_URL"); ok {
+		cfg.JobQueueNATSURL = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_NATS_STREAM"); ok {
+		cfg.JobQueueNATSStream = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_NATS_SUBJECT"); ok {
+		cfg.JobQueueNATSSubject = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_NATS_CONSUMER"); ok {
+		cfg.JobQueueNATSConsumer = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_ADDR"); ok {
+		cfg.JobQueueRedisAddr = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_PASSWORD"); ok {
+		cfg.JobQueueRedisPassword = value
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_DB"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.JobQueueRedisDB); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_JOBQUEUE_REDIS_DB: %w", err)
+		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_STREAM"); ok {
+		cfg.JobQueueRedisStream = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_GROUP"); ok {
+		cfg.JobQueueRedisGroup = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_CONSUMER"); ok {
+		cfg.JobQueueRedisConsumer = strings.TrimSpace(value)
+	}
 
 	if cfg.Transport != TransportStdio && cfg.Transport != TransportHTTP {
 		return Config{}, fmt.Errorf("unsupported VIDERA_TRANSPORT: %s", cfg.Transport)
@@ -155,6 +220,36 @@ func Load() (Config, error) {
 	}
 	if cfg.SearchVisualWeight <= 0 {
 		return Config{}, fmt.Errorf("VIDERA_SEARCH_VISUAL_WEIGHT must be > 0")
+	}
+	if cfg.JobQueueBackend != JobQueueBackendInProcess && cfg.JobQueueBackend != JobQueueBackendNATS && cfg.JobQueueBackend != JobQueueBackendRedis {
+		return Config{}, fmt.Errorf("unsupported VIDERA_JOBQUEUE_BACKEND: %s", cfg.JobQueueBackend)
+	}
+	if cfg.JobQueueNATSURL == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_NATS_URL cannot be empty")
+	}
+	if cfg.JobQueueNATSStream == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_NATS_STREAM cannot be empty")
+	}
+	if cfg.JobQueueNATSSubject == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_NATS_SUBJECT cannot be empty")
+	}
+	if cfg.JobQueueNATSConsumer == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_NATS_CONSUMER cannot be empty")
+	}
+	if cfg.JobQueueRedisAddr == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_ADDR cannot be empty")
+	}
+	if cfg.JobQueueRedisDB < 0 {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_DB must be >= 0")
+	}
+	if cfg.JobQueueRedisStream == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_STREAM cannot be empty")
+	}
+	if cfg.JobQueueRedisGroup == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_GROUP cannot be empty")
+	}
+	if cfg.JobQueueRedisConsumer == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_CONSUMER cannot be empty")
 	}
 
 	return cfg, nil

@@ -34,6 +34,7 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.True(t, cfg.RemoteFetchEnabled)
 	require.Equal(t, 60, cfg.RemoteFetchTimeout)
 	require.Equal(t, 200, cfg.RemoteFetchMaxMB)
+	require.Equal(t, JobQueueBackendInProcess, cfg.JobQueueBackend)
 }
 
 func TestLoadInvalidTransportStillFails(t *testing.T) {
@@ -66,4 +67,22 @@ func TestLoadInvalidRemoteFetchMaxMBFails(t *testing.T) {
 	_, err := Load()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "VIDERA_REMOTE_FETCH_MAX_MB must be > 0")
+}
+
+func TestLoadInvalidJobQueueBackendFails(t *testing.T) {
+	t.Setenv("VIDERA_JOBQUEUE_BACKEND", "kafka")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported VIDERA_JOBQUEUE_BACKEND")
+}
+
+func TestLoadParsesRedisJobQueueDB(t *testing.T) {
+	t.Setenv("VIDERA_JOBQUEUE_BACKEND", "redis")
+	t.Setenv("VIDERA_JOBQUEUE_REDIS_DB", "3")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, JobQueueBackendRedis, cfg.JobQueueBackend)
+	require.Equal(t, 3, cfg.JobQueueRedisDB)
 }

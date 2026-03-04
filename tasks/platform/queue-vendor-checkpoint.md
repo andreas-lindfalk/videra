@@ -27,8 +27,9 @@ Scoring: 1 (weak) to 5 (strong), based on Videra constraints in `AGENTS.md`.
 ## Recommendation
 
 1. Keep in-process queueing as default baseline until explicit scale/SLO pressure appears.
-2. Use **NATS JetStream** as first external broker candidate for Phase 11 spike.
-3. Keep **Redis Streams** as fallback neutral/self-hosted alternative if NATS operational assumptions fail in target environments.
+2. Use **NATS JetStream** as first external broker candidate when queueing is a dedicated concern.
+3. Prefer **Redis Streams** first when Redis is already required for adjacent key/value workloads and reducing moving parts is a higher priority than broker specialization.
+4. Keep the non-selected option as a portability fallback path.
 
 ## Fallback and Portability Plan
 
@@ -61,3 +62,12 @@ Any broker selection PR must include:
 ## Phase Boundary Outcome
 
 Phase 10 decision: **No broker integration yet**. Proceed with documentation + interface planning only.
+
+## Phase 11 Spike Notes (Validated)
+
+- Added runtime-selectable queue backend wiring with `inprocess` default and non-default `nats`/`redis` adapters.
+- Kept MCP contract unchanged; queue payload remains instruction-only metadata (`jobId`, source reference, attempts), never media bytes.
+- Live broker contract evidence captured via integration tests:
+	- `TestNATSJetStreamJobQueueContractIntegration`
+	- `TestRedisStreamsJobQueueContractIntegration`
+- Both backends passed baseline contract behaviors (`enqueue`, `reserve`, `ack`, `retry`, `fail`, duplicate enqueue handling) with real containers.

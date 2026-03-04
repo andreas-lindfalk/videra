@@ -4,6 +4,16 @@
 
 No active task.
 
+### Definition of Done (Applied)
+
+- [ ] Scope is explicit (in/out) and aligned with current architecture decisions.
+- [ ] Required interfaces/contracts are updated without breaking existing MCP surface.
+- [ ] Fast tests pass (`make test`).
+- [ ] Integration tests pass (`make integration-test`) for changed behavior.
+- [ ] Build succeeds (`make build`) and, when relevant, container build succeeds (`make docker-build`).
+- [ ] `tasks/lessons.md` updated with at least one concrete learning (if applicable).
+- [ ] Todo is fully checked and ready for archive.
+
 ## Definition of Done Template
 
 Use this checklist at the top of each new phase/feature todo.

@@ -65,7 +65,13 @@ func run() error {
 		return fmt.Errorf("unsupported ingestion mode: %s", cfg.IngestionMode)
 	}
 
-	orchestrator := ingestion.NewSyncIndexOrchestrator(ingester, store)
+	queue, err := newJobQueue(cfg)
+	if err != nil {
+		return fmt.Errorf("initialize job queue: %w", err)
+	}
+	log.Printf("job queue backend: %s", cfg.JobQueueBackend)
+
+	orchestrator := ingestion.NewSyncIndexOrchestratorWithQueue(ingester, store, queue)
 	mcpSrv := mcpserver.New(serverName, serverVersion, orchestrator, store, cfg.DefaultSearchLimit, cfg.RuntimeMode, mcpserver.RankingOptions{
 		AudioWeight:  cfg.SearchAudioWeight,
 		VisualWeight: cfg.SearchVisualWeight,
@@ -81,5 +87,30 @@ func run() error {
 		return httpServer.Start(cfg.HTTPAddr)
 	default:
 		return fmt.Errorf("unsupported transport: %s", cfg.Transport)
+	}
+}
+
+func newJobQueue(cfg config.Config) (ingestion.JobQueue, error) {
+	switch cfg.JobQueueBackend {
+	case config.JobQueueBackendInProcess:
+		return ingestion.NewInProcessJobQueue(128), nil
+	case config.JobQueueBackendNATS:
+		return ingestion.NewNATSJetStreamJobQueue(ingestion.NATSJetStreamQueueConfig{
+			URL:      cfg.JobQueueNATSURL,
+			Stream:   cfg.JobQueueNATSStream,
+			Subject:  cfg.JobQueueNATSSubject,
+			Consumer: cfg.JobQueueNATSConsumer,
+		})
+	case config.JobQueueBackendRedis:
+		return ingestion.NewRedisStreamsJobQueue(ingestion.RedisStreamsQueueConfig{
+			Addr:     cfg.JobQueueRedisAddr,
+			Password: cfg.JobQueueRedisPassword,
+			DB:       cfg.JobQueueRedisDB,
+			Stream:   cfg.JobQueueRedisStream,
+			Group:    cfg.JobQueueRedisGroup,
+			Consumer: cfg.JobQueueRedisConsumer,
+		})
+	default:
+		return nil, fmt.Errorf("unsupported job queue backend: %s", cfg.JobQueueBackend)
 	}
 }
