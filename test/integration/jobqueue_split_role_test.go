@@ -43,7 +43,7 @@ func TestIndexVideoAsyncSplitRoleRedisLifecycle(t *testing.T) {
 	workerEnv["VIDERA_JOBQUEUE_ROLE"] = "worker"
 	workerContainer := startVideraWorkerContainerWithEnvAndHostPorts(t, ctx, workerEnv, nil)
 
-	_, cli := startVideraContainerWithEnvAndHostPorts(t, ctx, sharedEnv, nil)
+	apiContainer, cli := startVideraContainerWithEnvAndHostPorts(t, ctx, sharedEnv, nil)
 	resetIndex(t, ctx, cli)
 
 	initResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
@@ -70,6 +70,15 @@ func TestIndexVideoAsyncSplitRoleRedisLifecycle(t *testing.T) {
 	videoID, ok := jobPayload["videoId"].(string)
 	require.True(t, ok)
 	require.NotEmpty(t, videoID)
+
+	require.Eventually(t, func() bool {
+		listResult, listErr := cli.CallTool(ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_videos"}})
+		if listErr != nil || listResult.IsError {
+			return false
+		}
+		videos, castOK := listResult.StructuredContent.([]any)
+		return castOK && len(videos) == 0
+	}, 2*time.Second, 100*time.Millisecond)
 
 	failResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -120,6 +129,11 @@ func TestIndexVideoAsyncSplitRoleRedisLifecycle(t *testing.T) {
 			strings.Contains(logs, "queue_lifecycle event=retry_scheduled job_id="+failJobID) &&
 			strings.Contains(logs, "queue_lifecycle event=retry_exhausted job_id="+failJobID)
 	}, 5*time.Second, 100*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		logs := readContainerLogs(t, ctx, apiContainer)
+		return strings.Contains(logs, "split-role shared storage is disabled")
+	}, 3*time.Second, 100*time.Millisecond)
 }
 
 func cloneEnvMap(input map[string]string) map[string]string {

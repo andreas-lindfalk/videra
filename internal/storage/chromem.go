@@ -2,11 +2,13 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/andreas-lindfalk/videra/internal/embedding"
@@ -14,8 +16,21 @@ import (
 )
 
 const segmentsCollection = "segments"
+const manifestDirName = "video-manifests"
+
+type ChromemStoreOptions struct {
+	SplitSharedStorage bool
+}
+
+type persistedVideoManifest struct {
+	Video    Video     `json:"video"`
+	Segments []Segment `json:"segments"`
+}
 
 type ChromemStore struct {
+	dataDir    string
+	syncShared bool
+
 	db         *chromem.DB
 	collection *chromem.Collection
 	resetCount int
@@ -29,6 +44,10 @@ type ChromemStore struct {
 }
 
 func NewChromemStore(dataDir string, textEmbedder embedding.TextEmbedder) (*ChromemStore, error) {
+	return NewChromemStoreWithOptions(dataDir, textEmbedder, ChromemStoreOptions{})
+}
+
+func NewChromemStoreWithOptions(dataDir string, textEmbedder embedding.TextEmbedder, options ChromemStoreOptions) (*ChromemStore, error) {
 	if dataDir == "" {
 		dataDir = "./data"
 	}
@@ -38,6 +57,11 @@ func NewChromemStore(dataDir string, textEmbedder embedding.TextEmbedder) (*Chro
 
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
+	}
+	if options.SplitSharedStorage {
+		if err := os.MkdirAll(filepath.Join(dataDir, manifestDirName), 0o755); err != nil {
+			return nil, fmt.Errorf("create manifest dir: %w", err)
+		}
 	}
 
 	dbPath := filepath.Join(dataDir, "chromem.gob")
@@ -51,7 +75,9 @@ func NewChromemStore(dataDir string, textEmbedder embedding.TextEmbedder) (*Chro
 		return nil, fmt.Errorf("get or create segments collection: %w", err)
 	}
 
-	return &ChromemStore{
+	store := &ChromemStore{
+		dataDir:         dataDir,
+		syncShared:      options.SplitSharedStorage,
 		db:              db,
 		collection:      collection,
 		embedder:        textEmbedder,
@@ -59,10 +85,24 @@ func NewChromemStore(dataDir string, textEmbedder embedding.TextEmbedder) (*Chro
 		transcripts:     map[string][]Segment{},
 		videosByPath:    map[string]string{},
 		segmentCounters: map[string]int{},
-	}, nil
+	}
+
+	if store.syncShared {
+		if err := store.loadManifestsFromDisk(); err != nil {
+			return nil, fmt.Errorf("load persisted manifests: %w", err)
+		}
+	}
+
+	return store, nil
 }
 
 func (s *ChromemStore) IndexVideo(ctx context.Context, video Video, segments []Segment) error {
+	if s.syncShared {
+		if err := s.loadManifestsFromDisk(); err != nil {
+			return fmt.Errorf("load persisted manifests: %w", err)
+		}
+	}
+
 	s.mu.RLock()
 	collection := s.collection
 	s.mu.RUnlock()
@@ -116,6 +156,11 @@ func (s *ChromemStore) IndexVideo(ctx context.Context, video Video, segments []S
 	s.videos[video.ID] = video
 	s.videosByPath[video.FilePath] = video.ID
 	s.transcripts[video.ID] = append([]Segment(nil), segments...)
+	if s.syncShared {
+		if err := s.persistVideoManifest(video, segments); err != nil {
+			return fmt.Errorf("persist video manifest: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -137,30 +182,18 @@ func (s *ChromemStore) SearchSegments(ctx context.Context, queryEmbedding []floa
 	}
 
 	results, err := collection.QueryEmbedding(ctx, queryEmbedding, limit, nil, nil)
+	if err == nil && len(results) > 0 {
+		return mapChromemResults(results), nil
+	}
+
+	if s.syncShared {
+		_ = s.loadManifestsFromDisk()
+	}
+
 	if err != nil {
 		return s.fallbackSegments(limit), nil
 	}
-
-	out := make([]SearchResult, 0, len(results))
-	for _, result := range results {
-		startMs, _ := strconv.ParseInt(result.Metadata["start_ms"], 10, 64)
-		endMs, _ := strconv.ParseInt(result.Metadata["end_ms"], 10, 64)
-		segmentType := SegmentType(result.Metadata["type"])
-
-		out = append(out, SearchResult{
-			Segment: Segment{
-				VideoID:    result.Metadata["video_id"],
-				StartMs:    startMs,
-				EndMs:      endMs,
-				Text:       result.Content,
-				Type:       segmentType,
-				SourcePath: result.Metadata["source_path"],
-			},
-			Score: result.Similarity,
-		})
-	}
-
-	return out, nil
+	return s.fallbackSegments(limit), nil
 }
 
 func (s *ChromemStore) fallbackSegments(limit int) []SearchResult {
@@ -189,6 +222,12 @@ func (s *ChromemStore) EmbedQuery(_ context.Context, query string) []float32 {
 }
 
 func (s *ChromemStore) ListVideos(_ context.Context) ([]Video, error) {
+	if s.syncShared {
+		if err := s.loadManifestsFromDisk(); err != nil {
+			return nil, fmt.Errorf("load persisted manifests: %w", err)
+		}
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -205,6 +244,12 @@ func (s *ChromemStore) ListVideos(_ context.Context) ([]Video, error) {
 }
 
 func (s *ChromemStore) GetVideoBySourcePath(_ context.Context, sourcePath string) (Video, bool) {
+	if s.syncShared {
+		if err := s.loadManifestsFromDisk(); err != nil {
+			return Video{}, false
+		}
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -218,6 +263,12 @@ func (s *ChromemStore) GetVideoBySourcePath(_ context.Context, sourcePath string
 }
 
 func (s *ChromemStore) GetTranscript(_ context.Context, videoID string) ([]Segment, error) {
+	if s.syncShared {
+		if err := s.loadManifestsFromDisk(); err != nil {
+			return nil, fmt.Errorf("load persisted manifests: %w", err)
+		}
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -246,7 +297,147 @@ func (s *ChromemStore) Reset(_ context.Context) error {
 	s.videosByPath = map[string]string{}
 	s.segmentCounters = map[string]int{}
 
+	if s.syncShared {
+		manifestDir := filepath.Join(s.dataDir, manifestDirName)
+		if err := os.RemoveAll(manifestDir); err != nil {
+			return fmt.Errorf("clear manifest dir: %w", err)
+		}
+		if err := os.MkdirAll(manifestDir, 0o755); err != nil {
+			return fmt.Errorf("recreate manifest dir: %w", err)
+		}
+	}
+
 	return nil
+}
+
+func mapChromemResults(results []chromem.Result) []SearchResult {
+	out := make([]SearchResult, 0, len(results))
+	for _, result := range results {
+		startMs, _ := strconv.ParseInt(result.Metadata["start_ms"], 10, 64)
+		endMs, _ := strconv.ParseInt(result.Metadata["end_ms"], 10, 64)
+		segmentType := SegmentType(result.Metadata["type"])
+
+		out = append(out, SearchResult{
+			Segment: Segment{
+				VideoID:    result.Metadata["video_id"],
+				StartMs:    startMs,
+				EndMs:      endMs,
+				Text:       result.Content,
+				Type:       segmentType,
+				SourcePath: result.Metadata["source_path"],
+			},
+			Score: result.Similarity,
+		})
+	}
+
+	return out
+}
+
+func (s *ChromemStore) loadManifestsFromDisk() error {
+	manifestDir := filepath.Join(s.dataDir, manifestDirName)
+	if err := os.MkdirAll(manifestDir, 0o755); err != nil {
+		return fmt.Errorf("create manifest dir: %w", err)
+	}
+
+	entries, err := os.ReadDir(manifestDir)
+	if err != nil {
+		return fmt.Errorf("read manifest dir: %w", err)
+	}
+
+	videos := map[string]Video{}
+	transcripts := map[string][]Segment{}
+	videosByPath := map[string]string{}
+	segmentCounters := map[string]int{}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
+			continue
+		}
+
+		manifestPath := filepath.Join(manifestDir, entry.Name())
+		payload, readErr := os.ReadFile(manifestPath)
+		if readErr != nil {
+			return fmt.Errorf("read manifest %s: %w", entry.Name(), readErr)
+		}
+
+		var manifest persistedVideoManifest
+		if decodeErr := json.Unmarshal(payload, &manifest); decodeErr != nil {
+			return fmt.Errorf("decode manifest %s: %w", entry.Name(), decodeErr)
+		}
+		if strings.TrimSpace(manifest.Video.ID) == "" || strings.TrimSpace(manifest.Video.FilePath) == "" {
+			continue
+		}
+
+		copiedSegments := append([]Segment(nil), manifest.Segments...)
+		videos[manifest.Video.ID] = manifest.Video
+		transcripts[manifest.Video.ID] = copiedSegments
+		videosByPath[manifest.Video.FilePath] = manifest.Video.ID
+		segmentCounters[manifest.Video.ID] = len(copiedSegments)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.videos = videos
+	s.transcripts = transcripts
+	s.videosByPath = videosByPath
+	s.segmentCounters = segmentCounters
+
+	return nil
+}
+
+func (s *ChromemStore) persistVideoManifest(video Video, segments []Segment) error {
+	manifestDir := filepath.Join(s.dataDir, manifestDirName)
+	if err := os.MkdirAll(manifestDir, 0o755); err != nil {
+		return fmt.Errorf("create manifest dir: %w", err)
+	}
+
+	copiedSegments := make([]Segment, 0, len(segments))
+	for _, segment := range segments {
+		copied := segment
+		copied.Embedding = nil
+		copiedSegments = append(copiedSegments, copied)
+	}
+
+	manifest := persistedVideoManifest{
+		Video:    video,
+		Segments: copiedSegments,
+	}
+	payload, err := json.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("marshal manifest: %w", err)
+	}
+
+	tempFile, err := os.CreateTemp(manifestDir, "manifest-*.json")
+	if err != nil {
+		return fmt.Errorf("create manifest temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	if _, err := tempFile.Write(payload); err != nil {
+		_ = tempFile.Close()
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("write manifest temp file: %w", err)
+	}
+	if err := tempFile.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("close manifest temp file: %w", err)
+	}
+
+	manifestPath := filepath.Join(manifestDir, sanitizeManifestFileName(video.ID)+".json")
+	if err := os.Rename(tempPath, manifestPath); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("commit manifest file: %w", err)
+	}
+
+	return nil
+}
+
+func sanitizeManifestFileName(videoID string) string {
+	trimmed := strings.TrimSpace(videoID)
+	if trimmed == "" {
+		return "unknown"
+	}
+	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "_")
+	return replacer.Replace(trimmed)
 }
 
 var _ VectorStore = (*ChromemStore)(nil)

@@ -3,6 +3,8 @@
 tasks
 bin
 data
+videos
+.videra-integration-tmp
 *.log
 coverage.*
 *.out

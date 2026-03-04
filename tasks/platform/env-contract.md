@@ -49,6 +49,7 @@ Redis Streams options:
 - `VIDERA_JOBQUEUE_REDIS_GROUP` (default `videra-index-workers`)
 - `VIDERA_JOBQUEUE_REDIS_CONSUMER` (default `videra-index-worker`)
 - `VIDERA_JOBSTATE_REDIS_PREFIX` (default `videra:index:jobstatus:`)
+- `VIDERA_SPLIT_SHARED_STORAGE` (`true|false`, default `false`)
 
 Notes:
 
@@ -57,6 +58,8 @@ Notes:
 - `api|worker` split requires an external backend (`nats` or `redis`); `inprocess` remains all-in-one local default.
 - `worker` role requires `VIDERA_TRANSPORT=stdio`; startup fails fast if transport is configured as HTTP.
 - Async worker lifecycle emits structured `queue_lifecycle` logs with stable keys: `event`, `job_id`, `status`, `attempt`, `max_attempts`, `delay_ms`, `error`.
+- Split-role API data-plane visibility (`list_videos`, `search_video`, transcript reads) requires both roles to share `VIDERA_DATA_DIR` and set `VIDERA_SPLIT_SHARED_STORAGE=true`.
+- When `VIDERA_SPLIT_SHARED_STORAGE=false`, `get_index_job` remains shared-state correct but API-visible indexed content can be degraded in non-shared topologies (startup warning emitted).
 - Redis-first rollout operations and rollback drills are documented in `tasks/platform/queue-redis-first-runbook.md`.
 - Reproducible queue evidence baselines are tracked in `tasks/platform/queue-benchmark-evidence.md`.
 

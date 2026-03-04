@@ -108,3 +108,17 @@ Phase 10 decision: **No broker integration yet**. Proceed with documentation + i
 	- Keep `inprocess` as default.
 	- Use Redis first when consolidating stack components.
 	- Keep NATS as parity-tested fallback.
+
+## Phase 15 Split-Role Data-Plane Parity (Validated)
+
+- Added explicit split-role shared data-plane runtime contract:
+	- `VIDERA_SPLIT_SHARED_STORAGE=true` enables persisted manifest sync for API visibility under shared `VIDERA_DATA_DIR` mounts.
+	- Startup guidance now distinguishes shared-data enabled vs degraded control-plane-only split mode.
+- Added integration proof for shared data-plane visibility:
+	- `TestIndexVideoAsyncSplitRoleRedisSharedStorageVisibility` validates `index_video` async completion plus API `list_videos` / `search_video` visibility in split mode.
+- Added explicit non-shared degraded-mode semantics verification:
+	- `TestIndexVideoAsyncSplitRoleRedisLifecycle` asserts control-plane correctness with operator signal when shared data-plane is not enabled.
+- Recommendation status remains unchanged:
+	- Keep `inprocess` as default.
+	- Use Redis first when consolidating stack components.
+	- Keep NATS as parity-tested fallback.

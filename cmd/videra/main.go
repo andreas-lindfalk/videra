@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -46,7 +47,9 @@ func run() error {
 		}
 	}
 
-	store, err := storage.NewChromemStore(cfg.DataDir, embedding.NewDeterministicTextEmbedder())
+	store, err := storage.NewChromemStoreWithOptions(cfg.DataDir, embedding.NewDeterministicTextEmbedder(), storage.ChromemStoreOptions{
+		SplitSharedStorage: cfg.SplitSharedStorage,
+	})
 	if err != nil {
 		return fmt.Errorf("initialize store: %w", err)
 	}
@@ -79,6 +82,13 @@ func run() error {
 	}
 	log.Printf("job queue backend: %s", cfg.JobQueueBackend)
 	log.Printf("job queue role: %s", cfg.JobQueueRole)
+	if cfg.JobQueueBackend != config.JobQueueBackendInProcess && (cfg.JobQueueRole == config.JobQueueRoleAPI || cfg.JobQueueRole == config.JobQueueRoleWorker) {
+		if cfg.SplitSharedStorage {
+			log.Printf("split-role shared storage enabled: ensure API and worker use the same VIDERA_DATA_DIR mount for list/search/transcript visibility (data_dir=%s)", strings.TrimSpace(cfg.DataDir))
+		} else {
+			log.Printf("warning: split-role shared storage is disabled; get_index_job remains shared-state correct, but list/search/transcript visibility may be degraded unless API and worker share VIDERA_DATA_DIR and VIDERA_SPLIT_SHARED_STORAGE=true")
+		}
+	}
 
 	orchestrator := ingestion.NewSyncIndexOrchestratorWithOptions(ingester, store, queue, ingestion.SyncIndexOrchestratorOptions{
 		JobStateStore:        jobStateStore,

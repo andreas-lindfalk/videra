@@ -27,6 +27,10 @@ func startVideraContainerWithEnv(t *testing.T, ctx context.Context, envOverrides
 }
 
 func startVideraContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int) (testcontainers.Container, *client.Client) {
+	return startVideraContainerWithEnvHostPortsAndMounts(t, ctx, envOverrides, hostPorts, nil)
+}
+
+func startVideraContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int, mounts []testcontainers.ContainerMount) (testcontainers.Container, *client.Client) {
 	t.Helper()
 
 	testcontainers.SkipIfProviderIsNotHealthy(t)
@@ -55,6 +59,9 @@ func startVideraContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, 
 	}
 	if len(hostPorts) > 0 {
 		customizers = append(customizers, testcontainers.WithHostPortAccess(hostPorts...))
+	}
+	if len(mounts) > 0 {
+		customizers = append(customizers, testcontainers.WithMounts(mounts...))
 	}
 
 	ctr, err := testcontainers.Run(ctx, "", customizers...)
@@ -92,6 +99,10 @@ func startVideraContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, 
 }
 
 func startVideraWorkerContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int) testcontainers.Container {
+	return startVideraWorkerContainerWithEnvHostPortsAndMounts(t, ctx, envOverrides, hostPorts, nil)
+}
+
+func startVideraWorkerContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int, mounts []testcontainers.ContainerMount) testcontainers.Container {
 	t.Helper()
 
 	testcontainers.SkipIfProviderIsNotHealthy(t)
@@ -118,6 +129,9 @@ func startVideraWorkerContainerWithEnvAndHostPorts(t *testing.T, ctx context.Con
 	}
 	if len(hostPorts) > 0 {
 		customizers = append(customizers, testcontainers.WithHostPortAccess(hostPorts...))
+	}
+	if len(mounts) > 0 {
+		customizers = append(customizers, testcontainers.WithMounts(mounts...))
 	}
 
 	ctr, err := testcontainers.Run(ctx, "", customizers...)

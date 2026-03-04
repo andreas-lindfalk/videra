@@ -68,6 +68,7 @@ type Config struct {
 	JobQueueRedisGroup    string
 	JobQueueRedisConsumer string
 	JobStateRedisPrefix   string
+	SplitSharedStorage    bool
 }
 
 func Load() (Config, error) {
@@ -103,6 +104,7 @@ func Load() (Config, error) {
 		JobQueueRedisGroup:    "videra-index-workers",
 		JobQueueRedisConsumer: "videra-index-worker",
 		JobStateRedisPrefix:   "videra:index:jobstatus:",
+		SplitSharedStorage:    false,
 	}
 
 	if value, ok := os.LookupEnv("VIDERA_TRANSPORT"); ok {
@@ -227,6 +229,17 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_JOBSTATE_REDIS_PREFIX"); ok {
 		cfg.JobStateRedisPrefix = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_SPLIT_SHARED_STORAGE"); ok {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		switch normalized {
+		case "true", "1", "yes", "on":
+			cfg.SplitSharedStorage = true
+		case "false", "0", "no", "off":
+			cfg.SplitSharedStorage = false
+		default:
+			return Config{}, fmt.Errorf("invalid VIDERA_SPLIT_SHARED_STORAGE: %s", value)
+		}
 	}
 
 	if cfg.Transport != TransportStdio && cfg.Transport != TransportHTTP {

@@ -179,3 +179,9 @@
 - **Worker-only role needs explicit transport semantics.** Enforce `VIDERA_TRANSPORT=stdio` for `VIDERA_JOBQUEUE_ROLE=worker` so invalid API-mode assumptions fail at startup instead of at runtime.
 - **Lifecycle logs need stable keys before rollout.** A fixed `queue_lifecycle` schema (`event`, `job_id`, `status`, `attempt`, `max_attempts`, `delay_ms`, `error`) makes ops dashboards and incident triage durable across refactors.
 - **Observability should be integration-proven, not assumed.** Split-role tests should assert worker logs for both success and retry-exhausted paths to validate operator visibility under real container wiring.
+
+## 2026-03-04 — Split-Role Data-Plane Parity
+
+- **Control-plane success does not imply data-plane visibility.** `get_index_job=completed` can still coexist with empty `list_videos`/`search_video` unless API and worker share index storage explicitly.
+- **Make shared-storage behavior explicit in runtime config.** A dedicated split-role data-plane flag (`VIDERA_SPLIT_SHARED_STORAGE`) reduces ambiguity and makes operator intent auditable.
+- **Prove both sides in integration tests.** Keep one test for degraded non-shared semantics and one for shared-mount visibility success so regressions in either path are caught quickly.

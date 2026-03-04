@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,14 +59,23 @@ func NewNATSJetStreamJobQueue(cfg NATSJetStreamQueueConfig) (*NATSJetStreamJobQu
 			nc.Close()
 			return nil, err
 		}
-		if _, addErr := js.AddStream(&nats.StreamConfig{
+		streamConfig := &nats.StreamConfig{
 			Name:      cfg.Stream,
 			Subjects:  []string{cfg.Subject},
 			Retention: nats.WorkQueuePolicy,
 			Storage:   nats.FileStorage,
-		}); addErr != nil {
-			nc.Close()
-			return nil, addErr
+		}
+		if _, addErr := js.AddStream(streamConfig); addErr != nil {
+			if shouldFallbackToMemoryStorage(addErr) {
+				streamConfig.Storage = nats.MemoryStorage
+				if _, retryErr := js.AddStream(streamConfig); retryErr != nil {
+					nc.Close()
+					return nil, retryErr
+				}
+			} else {
+				nc.Close()
+				return nil, addErr
+			}
 		}
 	}
 
@@ -97,6 +107,13 @@ func NewNATSJetStreamJobQueue(cfg NATSJetStreamQueueConfig) (*NATSJetStreamJobQu
 		sub:      sub,
 		inFlight: map[string]*nats.Msg{},
 	}, nil
+}
+
+func shouldFallbackToMemoryStorage(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "insufficient storage resources")
 }
 
 func (q *NATSJetStreamJobQueue) Enqueue(_ context.Context, job JobEnvelope) error {

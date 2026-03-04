@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -63,4 +64,10 @@ func TestDecodeRedisJobValue(t *testing.T) {
 	_, err = decodeRedisJobValue(123)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported type")
+}
+
+func TestShouldFallbackToMemoryStorage(t *testing.T) {
+	require.False(t, shouldFallbackToMemoryStorage(nil))
+	require.False(t, shouldFallbackToMemoryStorage(errors.New("other error")))
+	require.True(t, shouldFallbackToMemoryStorage(errors.New("nats: insufficient storage resources available")))
 }

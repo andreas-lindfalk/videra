@@ -39,6 +39,7 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.Equal(t, 3, cfg.JobQueueRetryMax)
 	require.Equal(t, 250, cfg.JobQueueRetryBackoff)
 	require.Equal(t, 250, cfg.JobQueueWorkerPollMS)
+	require.False(t, cfg.SplitSharedStorage)
 }
 
 func TestLoadInvalidTransportStillFails(t *testing.T) {
@@ -131,4 +132,20 @@ func TestLoadParsesRedisJobQueueDB(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, JobQueueBackendRedis, cfg.JobQueueBackend)
 	require.Equal(t, 3, cfg.JobQueueRedisDB)
+}
+
+func TestLoadParsesSplitSharedStorageFlag(t *testing.T) {
+	t.Setenv("VIDERA_SPLIT_SHARED_STORAGE", "true")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.True(t, cfg.SplitSharedStorage)
+}
+
+func TestLoadInvalidSplitSharedStorageFlagFails(t *testing.T) {
+	t.Setenv("VIDERA_SPLIT_SHARED_STORAGE", "maybe")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid VIDERA_SPLIT_SHARED_STORAGE")
 }

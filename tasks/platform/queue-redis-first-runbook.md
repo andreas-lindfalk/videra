@@ -28,6 +28,7 @@ Required env:
 - `VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS=<n>`
 - `VIDERA_JOBQUEUE_RETRY_BACKOFF_MS=<ms>`
 - `VIDERA_JOBQUEUE_WORKER_POLL_MS=<ms>`
+- `VIDERA_SPLIT_SHARED_STORAGE=true|false` (default `false`)
 
 Guardrails:
 
@@ -48,7 +49,8 @@ Recommended starter values:
 Split-mode requirement:
 
 - API and worker must share both queue backend and job-state backend configuration.
-- If `search_video`/`list_videos` are expected to reflect worker-ingested data, ensure a shared storage/data-plane strategy is in place for indexed content.
+- If `search_video`/`list_videos`/transcript reads are expected to reflect worker-ingested data, both roles must share the same `VIDERA_DATA_DIR` mount and set `VIDERA_SPLIT_SHARED_STORAGE=true`.
+- If `VIDERA_SPLIT_SHARED_STORAGE=false`, treat split role as control-plane-only (`index_video` async + `get_index_job`) unless data-plane sharing is explicitly added.
 
 ## 4) Cloud Run-Aligned Split Mode
 
@@ -71,6 +73,9 @@ Verification commands:
 ```bash
 make build && make test
 go test ./test/integration/... -v -tags=integration -run 'TestRedisStreamsJobQueueContractIntegration|TestIndexVideoAsyncSplitRoleRedisLifecycle' -count=1
+
+# shared data-plane visibility proof
+go test ./test/integration/... -v -tags=integration -run 'TestIndexVideoAsyncSplitRoleRedisSharedStorageVisibility' -count=1
 
 # startup guardrail (worker role + invalid transport should fail fast)
 go test ./test/integration/... -v -tags=integration -run 'TestWorkerRoleWithHTTPTransportFailsFastAtStartup' -count=1

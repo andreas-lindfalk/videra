@@ -170,6 +170,7 @@ Queue runtime environment options (Phase 12):
 - NATS job-state option: `VIDERA_JOBSTATE_NATS_BUCKET`
 - Redis options: `VIDERA_JOBQUEUE_REDIS_ADDR`, `VIDERA_JOBQUEUE_REDIS_PASSWORD`, `VIDERA_JOBQUEUE_REDIS_DB`, `VIDERA_JOBQUEUE_REDIS_STREAM`, `VIDERA_JOBQUEUE_REDIS_GROUP`, `VIDERA_JOBQUEUE_REDIS_CONSUMER`
 - Redis job-state option: `VIDERA_JOBSTATE_REDIS_PREFIX`
+- Split-role shared data-plane option: `VIDERA_SPLIT_SHARED_STORAGE` (`false` default)
 
 Role notes:
 
@@ -178,6 +179,13 @@ Role notes:
 - `worker` runs queue processing only (no MCP endpoint).
 - `worker` role is startup-validated to require `VIDERA_TRANSPORT=stdio` (fail-fast on invalid transport config).
 - `api|worker` split requires an external queue backend (`nats` or `redis`); `inprocess` is all-in-one only.
+- In split `api|worker` mode, API visibility of worker-indexed content (`list_videos` / `search_video` / transcript resource) requires shared `VIDERA_DATA_DIR` plus `VIDERA_SPLIT_SHARED_STORAGE=true` on both roles.
+
+Split-role data-plane notes (Phase 15):
+
+- With `VIDERA_SPLIT_SHARED_STORAGE=true`, the store persists/reloads index manifests from `VIDERA_DATA_DIR` so API reads can reflect worker indexing under a shared mount.
+- With `VIDERA_SPLIT_SHARED_STORAGE=false`, `get_index_job` remains shared-state correct, but API content visibility can be degraded in non-shared topologies.
+- Startup logs explicitly signal this mode to operators.
 
 Queue lifecycle observability keys (Phase 14):
 
