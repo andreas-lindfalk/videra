@@ -9,6 +9,11 @@ Goal: deploy Videra as a managed HTTPS MCP endpoint on GCP Cloud Run with operat
 - Exposure: HTTPS endpoint managed by Cloud Run
 - MCP URL outcome: `https://<service-url>/mcp`
 
+Image profile guidance:
+
+- Use `runtime-slim` for minimal/simulated or sidecar-driven flows.
+- Use `runtime-full` when real-mode fallback tooling (Whisper/OCR) is required.
+
 ## 1) Prerequisites
 
 - GCP project with billing enabled
@@ -22,7 +27,8 @@ export PROJECT_ID="<your-gcp-project-id>"
 export REGION="europe-west1"
 export REPO="videra"
 export SERVICE="videra-mcp"
-export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/videra:$(date +%Y%m%d-%H%M%S)"
+export PROFILE="full" # or: slim
+export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/videra:$(date +%Y%m%d-%H%M%S)-${PROFILE}"
 ```
 
 ## 2) Enable required APIs
@@ -57,7 +63,7 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev"
 From repo root:
 
 ```bash
-docker build -t "${IMAGE}" .
+docker build --target "runtime-${PROFILE}" -t "${IMAGE}" .
 docker push "${IMAGE}"
 ```
 

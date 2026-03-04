@@ -1,4 +1,4 @@
-.PHONY: build test integration-test docker-build run-stdio run-http local-up local-down local-smoke local-smoke-default local-e2e
+.PHONY: build test integration-test docker-build docker-build-slim docker-build-full run-stdio run-http run-stdio-full run-http-full local-up local-down local-smoke local-smoke-default local-e2e
 
 build:
 	go build -o bin/videra ./cmd/videra
@@ -9,14 +9,25 @@ test:
 integration-test:
 	go test ./test/integration/... -v -tags=integration -timeout=180s
 
-docker-build:
-	docker build -t videra:dev .
+docker-build: docker-build-slim
 
-run-stdio: docker-build
+docker-build-slim:
+	docker build --target runtime-slim -t videra:dev -t videra:dev-slim .
+
+docker-build-full:
+	docker build --target runtime-full -t videra:dev-full .
+
+run-stdio: docker-build-slim
 	docker run -i --rm videra:dev
 
-run-http: docker-build
+run-http: docker-build-slim
 	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http videra:dev
+
+run-stdio-full: docker-build-full
+	docker run -i --rm videra:dev-full
+
+run-http-full: docker-build-full
+	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http videra:dev-full
 
 local-up:
 	docker compose up -d --build

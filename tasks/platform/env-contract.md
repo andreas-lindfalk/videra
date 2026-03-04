@@ -25,6 +25,13 @@ Notes:
 - In `real` mode, ingestion first looks for sidecar transcript files (`.srt`/`.vtt`/`.txt`).
 - If no sidecar is found, it attempts FFmpeg audio extraction + Whisper CLI transcription.
 
+## Image Profile Contract (Phase 7)
+
+- `slim` profile is the default runtime baseline and should include ffmpeg-required paths for current default flows.
+- `full` profile extends `slim` with runtime dependencies needed for fallback tooling (Whisper path + OCR tooling).
+- MCP API/tool/resource behavior must remain identical across profiles; differences are runtime capability only.
+- Missing optional tooling must be explicit in logs/errors rather than implicit/silent fallback.
+
 ## Provider-Specific Differences (Deployment Layer Only)
 
 - Hetzner: server-visible local file paths can be mounted (`/videos/...`).

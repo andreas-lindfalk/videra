@@ -38,3 +38,7 @@ videos/*
 # Local runtime data (chromem persistence and other generated state)
 data/*
 !data/.gitkeep
+
+# Local build binaries
+/videra
+/bin/videra

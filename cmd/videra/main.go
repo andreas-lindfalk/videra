@@ -31,6 +31,17 @@ func run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
+	runtimeCaps := ingestion.DetectRuntimeCapabilities()
+	log.Printf("runtime capabilities: %s", runtimeCaps.Summary())
+	if cfg.IngestionMode == config.IngestionModeReal {
+		if !runtimeCaps.WhisperFallbackAvailable() {
+			log.Printf("warning: real-mode transcription fallback is unavailable (install `whisper` CLI or python whisper module, or provide sidecar transcripts)")
+		}
+		if !runtimeCaps.Tesseract {
+			log.Printf("info: tesseract not found; visual OCR enhancement is disabled")
+		}
+	}
+
 	store, err := storage.NewChromemStore(cfg.DataDir, embedding.NewDeterministicTextEmbedder())
 	if err != nil {
 		return fmt.Errorf("initialize store: %w", err)

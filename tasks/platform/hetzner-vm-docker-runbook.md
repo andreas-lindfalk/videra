@@ -2,6 +2,11 @@
 
 Goal: run Videra in an EU-hosted Hetzner VM with persistent data, TLS, and a stable MCP endpoint.
 
+Image profile guidance:
+
+- Use `*-slim` image tags for minimal/default flows.
+- Use `*-full` image tags when real-mode fallback tooling (Whisper/OCR) is required.
+
 ## 0) Baseline choices
 
 - Target: Hetzner Cloud VM (Ubuntu 24.04 LTS recommended)
@@ -70,7 +75,7 @@ VIDERA_DATA_DIR=/data
 VIDERA_LOG_LEVEL=info
 VIDERA_RUNTIME_MODE=prod
 DOMAIN=<your-domain>
-VIDERA_IMAGE=ghcr.io/andreas-lindfalk/videra:latest
+VIDERA_IMAGE=ghcr.io/andreas-lindfalk/videra:latest-full
 EOF
 ```
 

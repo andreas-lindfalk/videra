@@ -119,3 +119,8 @@
 
 - **Use sidecar-first, transcribe-second fallback for reliability.** In `real` mode, prefer deterministic sidecar transcripts, then fallback to FFmpeg audio extraction + Whisper CLI when sidecars are absent.
 - **Protect portability with optional dependencies.** Whisper and Tesseract should remain optional runtime enhancements; clear error messaging is required when missing.
+
+## 2026-03-04 — Container Runtime Profiles
+
+- **Split runtime images by capability, not by API behavior.** Keep a slim default image for speed and reproducibility, and a full tool-complete image for fallback paths while preserving identical MCP contracts.
+- **Capability visibility prevents deployment surprises.** Startup logging for ffmpeg/whisper/python/tesseract availability makes missing optional dependencies explicit before indexing requests fail.

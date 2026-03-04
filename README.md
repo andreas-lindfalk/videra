@@ -9,6 +9,7 @@ Privacy-native multimodal video memory MCP server in Go.
 - A new local `real` ingestion mode is available: `VIDERA_INGESTION_MODE=real` uses sidecar transcript files (`.srt`, `.vtt`, `.txt`) next to the video file.
 - In `real` mode, if no sidecar is found, Videra attempts FFmpeg audio extraction + Whisper CLI transcription (`whisper` or `python3 -m whisper`).
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
+- Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
 ## Quick Start (Local, Non-Cloud)
 
@@ -27,6 +28,13 @@ make local-up
 ```
 
 This starts the service on `http://localhost:8080/mcp`.
+
+By default, local compose builds the `runtime-slim` profile.
+Use the full tool-complete runtime profile when you need real-mode fallback tooling:
+
+```bash
+VIDERA_DOCKER_TARGET=runtime-full make local-up
+```
 
 ### 2) Run deterministic smoke test with a local file
 
@@ -104,9 +112,12 @@ Practical flow:
 - Build: `make build`
 - Fast tests: `make test`
 - Integration tests: `make integration-test`
-- Docker build: `make docker-build`
+- Docker build (slim default): `make docker-build` or `make docker-build-slim`
+- Docker build (full tool-complete): `make docker-build-full`
 - Stdio run: `make run-stdio`
 - HTTP run: `make run-http`
+- Stdio run (full): `make run-stdio-full`
+- HTTP run (full): `make run-http-full`
 
 ## Copilot / MCP Client Setup Notes
 

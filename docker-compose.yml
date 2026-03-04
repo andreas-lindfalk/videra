@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: ${VIDERA_DOCKER_TARGET:-runtime-slim}
     environment:
       VIDERA_TRANSPORT: http
       VIDERA_HTTP_ADDR: :8080
