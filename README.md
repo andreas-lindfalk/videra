@@ -7,6 +7,7 @@ Privacy-native multimodal video memory MCP server in Go.
 - The local MCP flow is working end-to-end (`index_video`, `search_video`, `list_videos`, transcript resource).
 - Default mode is `VIDERA_INGESTION_MODE=simulated` (fixture-like placeholder segments for deterministic testing).
 - A new local `real` ingestion mode is available: `VIDERA_INGESTION_MODE=real` uses sidecar transcript files (`.srt`, `.vtt`, `.txt`) next to the video file.
+- In `real` mode, if no sidecar is found, Videra attempts FFmpeg audio extraction + Whisper CLI transcription (`whisper` or `python3 -m whisper`).
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 
 ## Quick Start (Local, Non-Cloud)
@@ -61,6 +62,11 @@ VIDERA_INGESTION_MODE=real make local-up
 make local-smoke VIDEO=/videos/videos/IMG_3711.MOV QUERY="test query"
 make local-down
 ```
+
+Optional Whisper settings for transcription fallback:
+
+- `VIDERA_WHISPER_MODEL` (default: `tiny`)
+- `VIDERA_WHISPER_LANGUAGE` (optional language hint)
 
 ```bash
 VIDERA_VIDEO_DIR=/absolute/path/to/your/video/folder make local-up

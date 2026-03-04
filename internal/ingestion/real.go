@@ -21,22 +21,37 @@ var timeRangePattern = regexp.MustCompile(`(\d{2}:\d{2}:\d{2}[\.,]\d{3})\s*-->\s
 type RealIngester struct {
 	store          storage.VectorStore
 	ffmpeg         FFmpegRunner
+	transcriber    Transcriber
 	visualEmbedder VisualEmbedder
 	options        IndexOptions
 }
 
 func NewRealIngester(store storage.VectorStore, options IndexOptions) *RealIngester {
+	return NewRealIngesterWithDeps(store, options, ExecFFmpeg{}, NewWhisperCLITranscriber(), NewOCRVisualEmbedder(NewStubCLIPEmbedder()))
+}
+
+func NewRealIngesterWithDeps(store storage.VectorStore, options IndexOptions, ffmpeg FFmpegRunner, transcriber Transcriber, visualEmbedder VisualEmbedder) *RealIngester {
 	if options.FrameIntervalSec <= 0 {
 		options.FrameIntervalSec = 5
 	}
 	if options.Concurrency <= 0 {
 		options.Concurrency = 4
 	}
+	if ffmpeg == nil {
+		ffmpeg = ExecFFmpeg{}
+	}
+	if transcriber == nil {
+		transcriber = NewWhisperCLITranscriber()
+	}
+	if visualEmbedder == nil {
+		visualEmbedder = NewOCRVisualEmbedder(NewStubCLIPEmbedder())
+	}
 
 	return &RealIngester{
 		store:          store,
-		ffmpeg:         ExecFFmpeg{},
-		visualEmbedder: NewOCRVisualEmbedder(NewStubCLIPEmbedder()),
+		ffmpeg:         ffmpeg,
+		transcriber:    transcriber,
+		visualEmbedder: visualEmbedder,
 		options:        options,
 	}
 }
@@ -57,7 +72,7 @@ func (i *RealIngester) IndexVideo(ctx context.Context, path string) (storage.Vid
 	}
 
 	videoID := uuid.NewString()
-	audioSegments, err := loadAudioSegmentsFromSidecar(path, i.options.FrameIntervalSec)
+	audioSegments, err := i.loadAudioSegments(ctx, path)
 	if err != nil {
 		return storage.Video{}, err
 	}
@@ -134,6 +149,41 @@ func (i *RealIngester) buildVisualSegments(ctx context.Context, videoID, path st
 	sort.Strings(framePaths)
 
 	return BuildVisualSegments(videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
+}
+
+func (i *RealIngester) loadAudioSegments(ctx context.Context, videoPath string) ([]storage.Segment, error) {
+	segments, err := loadAudioSegmentsFromSidecar(videoPath, i.options.FrameIntervalSec)
+	if err == nil {
+		return segments, nil
+	}
+
+	tmpDir, tmpErr := os.MkdirTemp("", "videra-audio-*")
+	if tmpErr != nil {
+		return nil, fmt.Errorf("sidecar unavailable (%v) and failed to create temp dir for transcription: %w", err, tmpErr)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	audioPath := filepath.Join(tmpDir, "audio.mp3")
+	if extractErr := i.ffmpeg.ExtractAudio(ctx, videoPath, audioPath); extractErr != nil {
+		return nil, fmt.Errorf("sidecar unavailable (%v) and audio extraction failed: %w", err, extractErr)
+	}
+
+	if i.transcriber == nil {
+		return nil, fmt.Errorf("sidecar unavailable (%v) and no transcriber configured", err)
+	}
+
+	segments, transcribeErr := i.transcriber.Transcribe(ctx, audioPath)
+	if transcribeErr != nil {
+		return nil, fmt.Errorf("sidecar unavailable (%v) and transcription failed: %w", err, transcribeErr)
+	}
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("transcription returned no segments")
+	}
+
+	for idx := range segments {
+		segments[idx].Type = storage.SegmentTypeAudio
+	}
+	return segments, nil
 }
 
 func loadAudioSegmentsFromSidecar(videoPath string, intervalSec int) ([]storage.Segment, error) {

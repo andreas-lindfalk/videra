@@ -114,3 +114,8 @@
 
 - **Add a low-risk real-mode slice before full ASR integration.** A sidecar transcript path (`.srt`/`.vtt`/`.txt`) allows immediate local semantic validation without blocking on model/runtime integration complexity.
 - **Keep deterministic testing defaults.** Preserve `simulated` mode as the default for repeatable integration tests while enabling `real` mode explicitly for quality checks.
+
+## 2026-03-04 — Real Audio Transcription Fallback
+
+- **Use sidecar-first, transcribe-second fallback for reliability.** In `real` mode, prefer deterministic sidecar transcripts, then fallback to FFmpeg audio extraction + Whisper CLI when sidecars are absent.
+- **Protect portability with optional dependencies.** Whisper and Tesseract should remain optional runtime enhancements; clear error messaging is required when missing.

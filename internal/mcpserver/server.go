@@ -143,7 +143,7 @@ func (s *Server) registerTools() {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		hits := rerankHybridResults(results, limit, s.ranking, includeDebug)
+		hits := rerankHybridResults(results, query, limit, s.ranking, includeDebug)
 		payload := map[string]any{
 			"query":     query,
 			"count":     len(hits),
@@ -233,7 +233,7 @@ func parseVideoID(uri string) string {
 	return strings.TrimSpace(videoID)
 }
 
-func rerankHybridResults(results []storage.SearchResult, limit int, ranking RankingOptions, includeDebug bool) []storage.SearchHit {
+func rerankHybridResults(results []storage.SearchResult, query string, limit int, ranking RankingOptions, includeDebug bool) []storage.SearchHit {
 	if len(results) == 0 || limit <= 0 {
 		return nil
 	}
@@ -243,12 +243,13 @@ func rerankHybridResults(results []storage.SearchResult, limit int, ranking Rank
 	if ranking.VisualWeight <= 0 {
 		ranking.VisualWeight = 1.0
 	}
+	normalizedQuery := normalizeSearchText(query)
 
 	sorted := make([]storage.SearchResult, 0, len(results))
 	sorted = append(sorted, results...)
 	sort.SliceStable(sorted, func(i, j int) bool {
-		left := weightedScore(sorted[i], ranking)
-		right := weightedScore(sorted[j], ranking)
+		left := weightedScore(sorted[i], ranking) + lexicalMatchBoost(sorted[i].Segment.Text, normalizedQuery)
+		right := weightedScore(sorted[j], ranking) + lexicalMatchBoost(sorted[j].Segment.Text, normalizedQuery)
 		if left != right {
 			return left > right
 		}
@@ -284,7 +285,7 @@ func rerankHybridResults(results []storage.SearchResult, limit int, ranking Rank
 			}
 		}
 
-		weighted := float32(weightedScore(result, ranking))
+		weighted := float32(weightedScore(result, ranking) + lexicalMatchBoost(result.Segment.Text, normalizedQuery))
 		hit := storage.SearchHit{
 			VideoID:       result.Segment.VideoID,
 			StartMs:       result.Segment.StartMs,
@@ -314,6 +315,32 @@ func rerankHybridResults(results []storage.SearchResult, limit int, ranking Rank
 	}
 
 	return selected
+}
+
+func lexicalMatchBoost(snippet, normalizedQuery string) float64 {
+	if normalizedQuery == "" {
+		return 0
+	}
+	normalizedSnippet := normalizeSearchText(snippet)
+	if normalizedSnippet == "" {
+		return 0
+	}
+	if normalizedSnippet == normalizedQuery {
+		return 5.0
+	}
+	if strings.Contains(normalizedSnippet, normalizedQuery) {
+		return 2.0
+	}
+
+	return 0
+}
+
+func normalizeSearchText(value string) string {
+	trimmed := strings.TrimSpace(strings.ToLower(value))
+	if trimmed == "" {
+		return ""
+	}
+	return strings.Join(strings.Fields(trimmed), " ")
 }
 
 func weightedScore(result storage.SearchResult, ranking RankingOptions) float64 {
