@@ -10,6 +10,8 @@ Related docs:
 - `tasks/platform/queue-redis-first-runbook.md`
 - `tasks/platform/hetzner-gcp-parity-primer.md`
 - `tasks/platform/mvp-release-gate-evidence-2026-03-04.md`
+- `tasks/platform/rc1-stabilization-evidence-2026-03-04.md`
+- `tasks/platform/post-mvp-backlog-cut-2026-03-04.md`
 
 ## Required Command Gate
 
@@ -18,6 +20,12 @@ Run from repo root:
 ```bash
 make release-gate
 make release-gate-split
+```
+
+Optional preflight-only check:
+
+```bash
+make release-gate-preflight
 ```
 
 Expected outcome:
@@ -74,3 +82,19 @@ Go/No-Go:
 - **GO** when both gate commands pass and there are no unresolved contract regressions.
 - **NO-GO** when any gate command fails or parity/split-role checks are ambiguous.
 - If **NO-GO**, document mitigation and rerun both commands before re-evaluation.
+
+## Troubleshooting and Rerun Discipline (RC1 Stabilization)
+
+When release-gate runs fail intermittently due to local Docker pressure (for example no-space/image-cache pressure), use this deterministic rerun flow:
+
+```bash
+make release-gate-preflight
+make release-gate-clean
+make release-gate
+make release-gate-split
+```
+
+Notes:
+
+- `release-gate` now executes `integration-test-fresh` (`-count=1`) to avoid cached false-confidence runs.
+- `release-gate-clean` intentionally prunes builder cache + dangling images only (no volume prune).

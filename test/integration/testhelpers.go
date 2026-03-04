@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/mark3labs/mcp-go/client"
@@ -17,6 +18,7 @@ import (
 )
 
 const containerMCPPort = nat.Port("8080/tcp")
+const integrationStartupTimeout = 2 * time.Minute
 
 func startVideraContainer(t *testing.T, ctx context.Context) (testcontainers.Container, *client.Client) {
 	return startVideraContainerWithEnv(t, ctx, nil)
@@ -55,7 +57,7 @@ func startVideraContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Con
 		}),
 		testcontainers.WithExposedPorts(string(containerMCPPort)),
 		testcontainers.WithEnv(env),
-		testcontainers.WithWaitStrategy(wait.ForHTTP("/mcp").WithPort(containerMCPPort)),
+		testcontainers.WithWaitStrategyAndDeadline(integrationStartupTimeout, wait.ForHTTP("/mcp").WithPort(containerMCPPort).WithStartupTimeout(integrationStartupTimeout)),
 	}
 	if len(hostPorts) > 0 {
 		customizers = append(customizers, testcontainers.WithHostPortAccess(hostPorts...))
@@ -125,7 +127,7 @@ func startVideraWorkerContainerWithEnvHostPortsAndMounts(t *testing.T, ctx conte
 			KeepImage:  true,
 		}),
 		testcontainers.WithEnv(env),
-		testcontainers.WithWaitStrategy(wait.ForLog("queue worker started")),
+		testcontainers.WithWaitStrategyAndDeadline(integrationStartupTimeout, wait.ForLog("queue worker started").WithStartupTimeout(integrationStartupTimeout)),
 	}
 	if len(hostPorts) > 0 {
 		customizers = append(customizers, testcontainers.WithHostPortAccess(hostPorts...))

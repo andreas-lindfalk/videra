@@ -121,8 +121,11 @@ Practical flow:
 - Build: `make build`
 - Fast tests: `make test`
 - Integration tests: `make integration-test`
+- Integration tests (fresh run): `make integration-test-fresh`
 - MVP release gate (full): `make release-gate`
 - MVP split-role critical checks: `make release-gate-split`
+- MVP release gate preflight: `make release-gate-preflight`
+- MVP release gate cleanup (if local Docker pressure): `make release-gate-clean`
 - Docker build (slim default): `make docker-build` or `make docker-build-slim`
 - Docker build (full tool-complete): `make docker-build-full`
 - Stdio run: `make run-stdio`
@@ -143,6 +146,15 @@ make release-gate
 2. Run explicit split-role critical checks:
 
 ```bash
+make release-gate-split
+```
+
+If the full gate fails due to local Docker/cache pressure, run:
+
+```bash
+make release-gate-preflight
+make release-gate-clean
+make release-gate
 make release-gate-split
 ```
 

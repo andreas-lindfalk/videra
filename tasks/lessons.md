@@ -191,3 +191,9 @@
 - **A single release command reduces ambiguity.** A canonical gate (`make release-gate`) avoids fragmented validation across ad-hoc command chains.
 - **Keep split-role checks explicit even when included in full integration runs.** A focused gate (`make release-gate-split`) makes control-plane/data-plane semantics visible to operators and release reviewers.
 - **Treat parity evidence as a required artifact, not tribal knowledge.** A fixed release evidence template improves repeatability and go/no-go decisions.
+
+## 2026-03-04 — RC1 Integration Stability Hardening
+
+- **Fresh integration runs expose real instability sooner.** Using `-count=1` in release-gate integration checks avoids cached false confidence.
+- **Testcontainers deadline control should be explicit for containerized suites.** `WithWaitStrategyAndDeadline(...)` with a bounded startup window reduces intermittent `context deadline exceeded` failures in slow local environments.
+- **Stabilization should pair code-level hardening with operator rerun discipline.** Preflight/cleanup + deterministic rerun steps prevent ambiguous release outcomes.
