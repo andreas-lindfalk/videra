@@ -114,6 +114,7 @@ func (s *Server) registerTools() {
 		mcp.WithDescription("Hybrid semantic search across transcript and visual segments."),
 		mcp.WithString("query", mcp.Required(), mcp.Description("Search query text")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results")),
+		mcp.WithBoolean("includeDebug", mcp.Description("Optional: include ranking/debug metadata in response")),
 	)
 
 	s.mcp.AddTool(searchVideoTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -128,16 +129,33 @@ func (s *Server) registerTools() {
 		}
 
 		queryEmbedding := s.store.EmbedQuery(ctx, query)
+		includeDebug := false
+		if args, ok := req.Params.Arguments.(map[string]any); ok {
+			if rawDebug, ok := args["includeDebug"]; ok {
+				if parsed, ok := rawDebug.(bool); ok {
+					includeDebug = parsed
+				}
+			}
+		}
+
 		results, err := s.store.SearchSegments(ctx, queryEmbedding, limit*3)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		hits := rerankHybridResults(results, limit, s.ranking)
+		hits := rerankHybridResults(results, limit, s.ranking, includeDebug)
 		payload := map[string]any{
-			"query":   query,
-			"count":   len(hits),
-			"results": hits,
+			"query":     query,
+			"count":     len(hits),
+			"results":   hits,
+			"scoreMode": "weightedSimilarity",
+		}
+		if includeDebug {
+			payload["debug"] = map[string]any{
+				"audioWeight":    s.ranking.AudioWeight,
+				"visualWeight":   s.ranking.VisualWeight,
+				"candidateCount": len(results),
+			}
 		}
 		fallback, _ := json.Marshal(payload)
 		return mcp.NewToolResultStructured(payload, string(fallback)), nil
@@ -215,7 +233,7 @@ func parseVideoID(uri string) string {
 	return strings.TrimSpace(videoID)
 }
 
-func rerankHybridResults(results []storage.SearchResult, limit int, ranking RankingOptions) []storage.SearchHit {
+func rerankHybridResults(results []storage.SearchResult, limit int, ranking RankingOptions, includeDebug bool) []storage.SearchHit {
 	if len(results) == 0 || limit <= 0 {
 		return nil
 	}
@@ -266,15 +284,19 @@ func rerankHybridResults(results []storage.SearchResult, limit int, ranking Rank
 			}
 		}
 
+		weighted := float32(weightedScore(result, ranking))
 		hit := storage.SearchHit{
 			VideoID:       result.Segment.VideoID,
 			StartMs:       result.Segment.StartMs,
 			EndMs:         result.Segment.EndMs,
 			Type:          result.Segment.Type,
 			Snippet:       result.Segment.Text,
-			Similarity:    float32(weightedScore(result, ranking)),
+			Similarity:    weighted,
 			SourcePath:    result.Segment.SourcePath,
 			VisualContext: "",
+		}
+		if includeDebug {
+			hit.RawSimilarity = result.Score
 		}
 		if result.Segment.Type == storage.SegmentTypeVisual {
 			hit.VisualContext = result.Segment.Text

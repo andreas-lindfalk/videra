@@ -88,6 +88,11 @@ Never ignore or dismiss failing tests as "pre-existing" or "unrelated" failures.
 - **GPU indexing path:** Design ingestion boundaries so Whisper/CLIP workloads can later run on GPU-backed jobs without changing MCP interfaces.
 - **Storage portability:** Keep storage abstraction so local Docker and cloud backends can share the same domain logic.
 - **Dual deployment modes:** Maintain both self-hosted (on-prem/local Docker) and SaaS deployment paths from the same codebase.
+- **Protocol-native gateway expectations:** Plan for AgentGateway-native capabilities including MCP federation, JWT/RBAC/CEL policy controls, and observability at the edge.
+
+Reference:
+- AgentGateway docs: https://agentgateway.dev/docs/
+- MCP gateway overview: https://agentgateway.dev/docs/mcp/
 
 ## Cloud Migration Constraints
 
@@ -95,6 +100,7 @@ Never ignore or dismiss failing tests as "pre-existing" or "unrelated" failures.
 - Ensure data path configuration can target local volume mounts and cloud object storage-backed persistence.
 - Keep transport and auth concerns outside core tool logic so AgentGateway integration remains an edge concern.
 - Favor idempotent indexing operations and explicit job boundaries to fit async Cloud Run Job execution.
+- Keep MCP transport compatibility for federation patterns (stdio/SSE/streamable HTTP) expected by AgentGateway MCP integrations.
 
 ## GTM & Positioning Notes (2026-03-04)
 
@@ -116,6 +122,11 @@ Never ignore or dismiss failing tests as "pre-existing" or "unrelated" failures.
 - **Tier 1 (Community):** Free local MCP server for individual usage.
 - **Tier 2 (Pro/Team):** Team-ready deployment with cloud object storage integration and faster indexing.
 - **Tier 3 (Enterprise):** Managed SaaS or licensed self-hosted deployment with SSO and gateway controls.
+
+### Competitive Proof Discipline
+
+- Keep competitive positioning measurable and reproducible: benchmark claims should map to deterministic test fixtures and published result criteria.
+- Prefer defensible language ("verified", "measured", "integration-proven") over absolute marketing claims ("by miles") unless externally validated.
 
 ## Strategic Clarifications
 

@@ -14,8 +14,8 @@ func TestRerankHybridResultsDeterministicOrdering(t *testing.T) {
 		{Segment: storage.Segment{VideoID: "v1", StartMs: 0, EndMs: 1000, Type: storage.SegmentTypeAudio, Text: "c"}, Score: 0.7},
 	}
 
-	first := rerankHybridResults(input, 3, RankingOptions{AudioWeight: 1, VisualWeight: 1})
-	second := rerankHybridResults(input, 3, RankingOptions{AudioWeight: 1, VisualWeight: 1})
+	first := rerankHybridResults(input, 3, RankingOptions{AudioWeight: 1, VisualWeight: 1}, false)
+	second := rerankHybridResults(input, 3, RankingOptions{AudioWeight: 1, VisualWeight: 1}, false)
 
 	require.Equal(t, first, second)
 	require.Len(t, first, 3)
@@ -30,12 +30,14 @@ func TestRerankHybridResultsModalityWeighting(t *testing.T) {
 		{Segment: storage.Segment{VideoID: "v1", StartMs: 1000, EndMs: 2000, Type: storage.SegmentTypeVisual, Text: "visual-hit"}, Score: 0.7},
 	}
 
-	audioFavored := rerankHybridResults(input, 2, RankingOptions{AudioWeight: 1.5, VisualWeight: 1.0})
+	audioFavored := rerankHybridResults(input, 2, RankingOptions{AudioWeight: 1.5, VisualWeight: 1.0}, true)
 	require.Len(t, audioFavored, 2)
 	require.Equal(t, storage.SegmentTypeAudio, audioFavored[0].Type)
+	require.Greater(t, audioFavored[0].RawSimilarity, float32(0))
 
-	visualFavored := rerankHybridResults(input, 2, RankingOptions{AudioWeight: 1.0, VisualWeight: 2.0})
+	visualFavored := rerankHybridResults(input, 2, RankingOptions{AudioWeight: 1.0, VisualWeight: 2.0}, true)
 	require.Len(t, visualFavored, 2)
 	require.Equal(t, storage.SegmentTypeVisual, visualFavored[0].Type)
 	require.Equal(t, "visual-hit", visualFavored[0].Snippet)
+	require.Greater(t, visualFavored[0].RawSimilarity, float32(0))
 }

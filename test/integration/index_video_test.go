@@ -5,8 +5,10 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/andreas-lindfalk/videra/internal/proofpack"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/require"
@@ -196,6 +198,53 @@ func (s *defaultIntegrationSuite) TestIndexVideoMalformedInputReturnsToolError()
 	require.Contains(t, text.Text, "path is required")
 }
 
+func (s *defaultIntegrationSuite) TestIndexVideoLocalFileLikePathFlow() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	indexResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "/etc/hosts",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, indexResult.IsError)
+
+	indexPayload, ok := indexResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	videoID, ok := indexPayload["videoId"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, videoID)
+
+	resourceResult, err := cli.ReadResource(ctx, mcp.ReadResourceRequest{
+		Params: mcp.ReadResourceParams{URI: "video://" + videoID + "/transcript"},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, resourceResult.Contents)
+
+	searchResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_video",
+			Arguments: map[string]any{
+				"query": "roadmap",
+				"limit": 3,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, searchResult.IsError)
+
+	searchPayload, ok := searchResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	rawResults, ok := searchPayload["results"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, rawResults)
+}
+
 func (s *defaultIntegrationSuite) TestSearchVideoDeterministicOrdering() {
 	t := s.T()
 	ctx := s.ctx
@@ -366,6 +415,98 @@ func (s *defaultIntegrationSuite) TestIndexVideoRetrySafeAfterPartialFailure() {
 	require.Len(t, videos, 1)
 }
 
+func (s *defaultIntegrationSuite) TestProofPackScenariosEvidenceAndDeterminism() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	scenarios, err := proofpack.LoadScenarios()
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+
+	for _, scenario := range scenarios {
+		scenario := scenario
+		s.Run(scenario.Name, func() {
+			resetIndex(t, ctx, cli)
+
+			indexResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+				Params: mcp.CallToolParams{
+					Name: "index_video",
+					Arguments: map[string]any{
+						"path": scenario.VideoPath,
+					},
+				},
+			})
+			require.NoError(t, err)
+			require.False(t, indexResult.IsError)
+
+			firstResults := searchAndExtractResults(t, ctx, cli, scenario.Query, 5)
+			secondResults := searchAndExtractResults(t, ctx, cli, scenario.Query, 5)
+
+			require.Equal(t, firstResults, secondResults)
+			require.GreaterOrEqual(t, len(firstResults), scenario.MinResults)
+
+			first := firstResults[0]
+			require.Contains(t, first, "videoId")
+			require.Contains(t, first, "startMs")
+			require.Contains(t, first, "endMs")
+			require.Contains(t, first, "type")
+			require.Contains(t, first, "snippet")
+			require.Contains(t, first, "similarity")
+
+			matched := evidenceMatches(firstResults, scenario.ExpectedEvidence)
+			require.GreaterOrEqual(t, matched, len(scenario.ExpectedEvidence))
+		})
+	}
+}
+
+func (s *defaultIntegrationSuite) TestSearchVideoIncludeDebugMetadata() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	_, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/debug-metadata.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	searchResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "search_video",
+			Arguments: map[string]any{
+				"query":        "budget roadmap",
+				"limit":        3,
+				"includeDebug": true,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, searchResult.IsError)
+
+	payload, ok := searchResult.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "weightedSimilarity", payload["scoreMode"])
+
+	debugPayload, ok := payload["debug"].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, debugPayload, "audioWeight")
+	require.Contains(t, debugPayload, "visualWeight")
+	require.Contains(t, debugPayload, "candidateCount")
+
+	rawResults, ok := payload["results"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, rawResults)
+
+	first, ok := rawResults[0].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, first, "rawSimilarity")
+}
+
 type weightingIntegrationSuite struct {
 	suite.Suite
 
@@ -487,4 +628,27 @@ func topScoreForType(results []map[string]any, segmentType string) float64 {
 		}
 	}
 	return max
+}
+
+func evidenceMatches(results []map[string]any, expected []string) int {
+	joined := make([]string, 0, len(results))
+	for _, result := range results {
+		snippet := strings.ToLower(fmt.Sprintf("%v", result["snippet"]))
+		joined = append(joined, snippet)
+	}
+
+	matches := 0
+	for _, needle := range expected {
+		needle = strings.ToLower(strings.TrimSpace(needle))
+		if needle == "" {
+			continue
+		}
+		for _, snippet := range joined {
+			if strings.Contains(snippet, needle) {
+				matches++
+				break
+			}
+		}
+	}
+	return matches
 }

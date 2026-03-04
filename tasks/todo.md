@@ -1,6 +1,8 @@
 # Todo
 
-_No active feature todo. Add the next feature below._
+## Active Task
+
+No active task currently. Add the next phase here.
 
 ## Definition of Done Template
 

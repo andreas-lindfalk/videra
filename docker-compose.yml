@@ -17,3 +17,4 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/data
+      - ${VIDERA_VIDEO_DIR:-.}:/videos:ro

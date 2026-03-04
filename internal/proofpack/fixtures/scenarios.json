@@ -1,0 +1,23 @@
+[
+  {
+    "name": "engineering_incident_review",
+    "videoPath": "https://example.com/proofpack-engineering.mp4",
+    "query": "roadmap budget next actions",
+    "expectedEvidence": ["roadmap", "budget", "next actions"],
+    "minResults": 3
+  },
+  {
+    "name": "legal_compliance_evidence_lookup",
+    "videoPath": "https://example.com/proofpack-legal.mp4",
+    "query": "closing remarks and next actions",
+    "expectedEvidence": ["closing remarks", "next actions"],
+    "minResults": 2
+  },
+  {
+    "name": "product_interview_recall",
+    "videoPath": "https://example.com/proofpack-product.mp4",
+    "query": "intro segment discussion",
+    "expectedEvidence": ["intro segment", "discussion"],
+    "minResults": 2
+  }
+]

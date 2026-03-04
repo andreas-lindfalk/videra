@@ -60,3 +60,42 @@
 
 - **Keep auth concerns out of core server/config contracts.** MCP and ingestion boundaries should not require auth configuration to operate in local/integration mode.
 - **Add explicit tests for uncoupled config loading.** Validating config behavior with unrelated auth env vars helps prevent accidental edge-concern leakage into core runtime paths.
+
+## 2026-03-04 — AgentGateway Alignment (Source-Confirmed)
+
+- **AgentGateway is protocol-native for MCP + A2A.** Treat Videra as a federated MCP backend behind a single enterprise gateway endpoint.
+- **Edge controls should stay at the gateway.** JWT/RBAC/CEL policies, TLS, and observability belong at AgentGateway, not inside core ingestion/search logic.
+- **Integration planning should assume MCP federation workflows.** Keep Videra transport/runtime behavior compatible with gateway-side MCP federation and discovery patterns.
+
+## 2026-03-04 — Competitive Messaging Guardrails
+
+- **Use only evidence-backed claims in competitor comparisons.** Positioning should be anchored to reproducible benchmarks (latency, determinism, retrieval quality) and integration proofs.
+- **Do not promise backend choices that conflict with repo decisions.** Keep MVP messaging aligned with `chromem-go` unless architecture decisions are explicitly changed.
+- **Sell workflow ownership, not just search quality.** The strongest defensible narrative is multimodal retrieval + MCP context injection + privacy-native deployment.
+
+## 2026-03-04 — Proof Pack Benchmarking
+
+- **Keep benchmark scenarios as deterministic fixtures in-repo.** Versioned JSON fixtures make competitive claims reproducible and auditable.
+- **Measure repeatability, not just relevance.** Running the same query twice and asserting identical ordered results is a core proof artifact.
+- **Encode evidence coverage expectations per scenario.** Benchmark checks should require explicit snippet/evidence matches, not only non-empty result lists.
+
+## 2026-03-04 — Proof Metadata Compatibility
+
+- **Expose benchmarking/debug metadata behind opt-in flags.** Optional search metadata (`includeDebug`) supports proof artifacts without breaking existing client flows.
+- **Preserve primary response semantics.** Keep existing `similarity` behavior stable and add extra fields (e.g., `rawSimilarity`, debug block) as additive metadata only.
+
+## 2026-03-04 — MCP Argument Typing Pitfall
+
+- **Treat `req.Params.Arguments` as `any` unless typed helpers are used.** Do not index directly; type-assert to `map[string]any` before reading optional fields.
+- **Additive tool args should fail safe.** Optional flags (e.g., `includeDebug`) should default cleanly when missing or malformed.
+
+## 2026-03-04 — Local Validation UX Pattern
+
+- **Provide a one-command local loop as first-class workflow.** `local-up`, `local-smoke`, and `local-down` style tasks reduce setup ambiguity and support repeatable pre-cloud validation.
+- **Use explicit host-to-container path contracts for local files.** Mounting a configurable host video directory to `/videos` prevents path confusion during local indexing.
+- **Treat smoke CLI as integration contract check.** A lightweight MCP client executable that runs index/search/list/transcript in sequence is a practical anti-blackbox guardrail.
+
+## 2026-03-04 — Local Validation First (Pre-Cloud)
+
+- **Avoid CloudRun-first trial-and-error loops.** Keep a simple local developer validation path (service spin-up, local file indexing, MCP client connection) as a required pre-cloud gate.
+- **Treat local smoke tests as product UX.** If local setup/testing is hard, the platform feels like a black box regardless of backend quality.

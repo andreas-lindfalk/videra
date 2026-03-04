@@ -51,5 +51,6 @@ type SearchHit struct {
 	Snippet       string      `json:"snippet"`
 	VisualContext string      `json:"visualContext,omitempty"`
 	Similarity    float32     `json:"similarity"`
+	RawSimilarity float32     `json:"rawSimilarity,omitempty"`
 	SourcePath    string      `json:"sourcePath,omitempty"`
 }
