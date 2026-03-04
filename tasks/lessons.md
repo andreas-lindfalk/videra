@@ -99,3 +99,8 @@
 
 - **Avoid CloudRun-first trial-and-error loops.** Keep a simple local developer validation path (service spin-up, local file indexing, MCP client connection) as a required pre-cloud gate.
 - **Treat local smoke tests as product UX.** If local setup/testing is hard, the platform feels like a black box regardless of backend quality.
+
+## 2026-03-04 — EU Deployment Parity Requirement
+
+- **Treat Hetzner support as equal-priority to Cloud Run in planning.** For Europe-first customers, deployment location is a product requirement, not a later ops detail.
+- **Avoid Cloud-provider coupling in core runtime.** Keep provider differences in infra/runbooks while preserving identical MCP behavior and contracts.

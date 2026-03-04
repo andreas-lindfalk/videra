@@ -84,7 +84,9 @@ Never ignore or dismiss failing tests as "pre-existing" or "unrelated" failures.
 
 - **Enterprise front door:** AgentGateway is the preferred enterprise entry point for auth, RBAC, rate limiting, and auditing in multi-tenant deployments.
 - **Federation model:** Videra should remain composable as one MCP service among many behind a single gateway.
-- **Cloud Run-first scaling:** Prioritize scale-to-zero for search API and separate heavy indexing workloads into Cloud Run Jobs.
+- **Cloud deployment parity (Cloud Run + Hetzner):** Treat GCP/Cloud Run and Hetzner as equal-priority deployment targets.
+- **EU data-residency path:** Preserve a first-class EU-hosted path (Hetzner/self-hosted) for customers that do not want data outside Europe.
+- **Cloud Run scaling path:** Keep scale-to-zero-friendly search API behavior and separate heavy indexing workloads into async job boundaries.
 - **GPU indexing path:** Design ingestion boundaries so Whisper/CLIP workloads can later run on GPU-backed jobs without changing MCP interfaces.
 - **Storage portability:** Keep storage abstraction so local Docker and cloud backends can share the same domain logic.
 - **Dual deployment modes:** Maintain both self-hosted (on-prem/local Docker) and SaaS deployment paths from the same codebase.
@@ -100,7 +102,13 @@ Reference:
 - Ensure data path configuration can target local volume mounts and cloud object storage-backed persistence.
 - Keep transport and auth concerns outside core tool logic so AgentGateway integration remains an edge concern.
 - Favor idempotent indexing operations and explicit job boundaries to fit async Cloud Run Job execution.
+- Favor idempotent indexing operations and explicit job boundaries to fit async execution models on both Cloud Run and Hetzner-based schedulers.
 - Keep MCP transport compatibility for federation patterns (stdio/SSE/streamable HTTP) expected by AgentGateway MCP integrations.
+
+## Hetzner Equivalency Note
+
+- Hetzner does not offer a direct Cloud Run equivalent; plan baseline deployments as Docker containers on Hetzner VMs (or Kubernetes) behind a reverse proxy/load balancer.
+- Keep provider differences in deployment manifests and ops runbooks, not in MCP/runtime business logic.
 
 ## GTM & Positioning Notes (2026-03-04)
 

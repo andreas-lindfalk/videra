@@ -2,6 +2,12 @@
 
 Privacy-native multimodal video memory MCP server in Go.
 
+## Current MVP Status
+
+- The local MCP flow is working end-to-end (`index_video`, `search_video`, `list_videos`, transcript resource).
+- Current transcript/visual text content is simulated placeholder content; this validates pipeline/runtime behavior more than true semantic understanding.
+- Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
+
 ## Quick Start (Local, Non-Cloud)
 
 This is the recommended pre-CloudRun validation path.
