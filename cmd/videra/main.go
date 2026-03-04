@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/andreas-lindfalk/videra/internal/config"
 	"github.com/andreas-lindfalk/videra/internal/embedding"
@@ -69,9 +73,39 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("initialize job queue: %w", err)
 	}
+	jobStateStore, err := newIndexJobStateStore(cfg)
+	if err != nil {
+		return fmt.Errorf("initialize job state store: %w", err)
+	}
 	log.Printf("job queue backend: %s", cfg.JobQueueBackend)
+	log.Printf("job queue role: %s", cfg.JobQueueRole)
 
-	orchestrator := ingestion.NewSyncIndexOrchestratorWithQueue(ingester, store, queue)
+	orchestrator := ingestion.NewSyncIndexOrchestratorWithOptions(ingester, store, queue, ingestion.SyncIndexOrchestratorOptions{
+		JobStateStore:        jobStateStore,
+		RunInlineAsyncWorker: false,
+		SyncMaxAttempts:      2,
+		AsyncRetryMax:        cfg.JobQueueRetryMax,
+		AsyncRetryBackoff:    time.Duration(cfg.JobQueueRetryBackoff) * time.Millisecond,
+		WorkerPollInterval:   time.Duration(cfg.JobQueueWorkerPollMS) * time.Millisecond,
+	})
+
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if cfg.JobQueueRole == config.JobQueueRoleWorker {
+		log.Printf("queue worker started (role=worker)")
+		return orchestrator.RunWorker(shutdownCtx)
+	}
+
+	if cfg.JobQueueRole == config.JobQueueRoleAll {
+		go func() {
+			log.Printf("queue worker started (role=all)")
+			if err := orchestrator.RunWorker(shutdownCtx); err != nil {
+				log.Printf("queue worker stopped with error: %v", err)
+			}
+		}()
+	}
+
 	mcpSrv := mcpserver.New(serverName, serverVersion, orchestrator, store, cfg.DefaultSearchLimit, cfg.RuntimeMode, mcpserver.RankingOptions{
 		AudioWeight:  cfg.SearchAudioWeight,
 		VisualWeight: cfg.SearchVisualWeight,
@@ -112,5 +146,26 @@ func newJobQueue(cfg config.Config) (ingestion.JobQueue, error) {
 		})
 	default:
 		return nil, fmt.Errorf("unsupported job queue backend: %s", cfg.JobQueueBackend)
+	}
+}
+
+func newIndexJobStateStore(cfg config.Config) (ingestion.IndexJobStateStore, error) {
+	switch cfg.JobQueueBackend {
+	case config.JobQueueBackendInProcess:
+		return ingestion.NewInMemoryIndexJobStateStore(), nil
+	case config.JobQueueBackendNATS:
+		return ingestion.NewNATSIndexJobStateStore(ingestion.NATSIndexJobStateStoreConfig{
+			URL:    cfg.JobQueueNATSURL,
+			Bucket: cfg.JobStateNATSBucket,
+		})
+	case config.JobQueueBackendRedis:
+		return ingestion.NewRedisIndexJobStateStore(ingestion.RedisIndexJobStateStoreConfig{
+			Addr:      cfg.JobQueueRedisAddr,
+			Password:  cfg.JobQueueRedisPassword,
+			DB:        cfg.JobQueueRedisDB,
+			KeyPrefix: cfg.JobStateRedisPrefix,
+		})
+	default:
+		return nil, fmt.Errorf("unsupported job queue backend for state store: %s", cfg.JobQueueBackend)
 	}
 }

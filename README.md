@@ -10,7 +10,7 @@ Privacy-native multimodal video memory MCP server in Go.
 - In `real` mode, if no sidecar is found, Videra attempts FFmpeg audio extraction + Whisper CLI transcription (`whisper` or `python3 -m whisper`).
 - In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
 - `index_video` supports `mode=async` for non-blocking indexing; poll status via `get_index_job` using returned `jobId`.
-- Async queue backend is runtime-selectable via `VIDERA_JOBQUEUE_BACKEND` (`inprocess` default; `nats` and `redis` spike adapters available as non-default paths).
+- Async queue backend is runtime-selectable via `VIDERA_JOBQUEUE_BACKEND` (`inprocess` default; `nats` and `redis` available), with runtime role split support via `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`).
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 - Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
@@ -159,11 +159,24 @@ Example initiation payload:
 }
 ```
 
-Queue backend environment options (Phase 11 spike):
+Queue runtime environment options (Phase 12):
 
 - `VIDERA_JOBQUEUE_BACKEND` (`inprocess|nats|redis`; default `inprocess`)
+- `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`; default `all`)
+- `VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS` (default `3`)
+- `VIDERA_JOBQUEUE_RETRY_BACKOFF_MS` (default `250`)
+- `VIDERA_JOBQUEUE_WORKER_POLL_MS` (default `250`)
 - NATS options: `VIDERA_JOBQUEUE_NATS_URL`, `VIDERA_JOBQUEUE_NATS_STREAM`, `VIDERA_JOBQUEUE_NATS_SUBJECT`, `VIDERA_JOBQUEUE_NATS_CONSUMER`
+- NATS job-state option: `VIDERA_JOBSTATE_NATS_BUCKET`
 - Redis options: `VIDERA_JOBQUEUE_REDIS_ADDR`, `VIDERA_JOBQUEUE_REDIS_PASSWORD`, `VIDERA_JOBQUEUE_REDIS_DB`, `VIDERA_JOBQUEUE_REDIS_STREAM`, `VIDERA_JOBQUEUE_REDIS_GROUP`, `VIDERA_JOBQUEUE_REDIS_CONSUMER`
+- Redis job-state option: `VIDERA_JOBSTATE_REDIS_PREFIX`
+
+Role notes:
+
+- `all` runs MCP API + worker loop in one process.
+- `api` runs MCP API only (enqueue + `get_index_job` reads shared job-state backend).
+- `worker` runs queue processing only (no MCP endpoint).
+- `api|worker` split requires an external queue backend (`nats` or `redis`); `inprocess` is all-in-one only.
 
 Queue payloads are job instructions (source reference + job metadata), not video bytes.
 

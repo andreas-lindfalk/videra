@@ -124,7 +124,7 @@ func (q *RedisStreamsJobQueue) Reserve(ctx context.Context, wait time.Duration) 
 	q.inFlight[receipt] = redisInFlightJob{messageID: message.ID, job: job}
 	q.mu.Unlock()
 
-	lease := JobLease{JobID: job.JobID, Receipt: receipt, LeasedUntil: time.Now().UTC()}
+	lease := JobLease{JobID: job.JobID, Receipt: receipt, Attempt: job.Attempt + 1, LeasedUntil: time.Now().UTC()}
 	return job, lease, true, nil
 }
 
@@ -145,6 +145,8 @@ func (q *RedisStreamsJobQueue) Retry(ctx context.Context, lease JobLease, _ stri
 	if err := q.client.XAck(ctx, q.stream, q.group, inFlight.messageID).Err(); err != nil {
 		return err
 	}
+
+	inFlight.job.Attempt++
 
 	if nextDelay <= 0 {
 		return q.Enqueue(ctx, inFlight.job)

@@ -49,6 +49,7 @@ func (q *InProcessJobQueue) Reserve(ctx context.Context, wait time.Duration) (Jo
 	select {
 	case job := <-q.queue:
 		lease := q.newLease(job.JobID)
+		lease.Attempt = job.Attempt + 1
 		q.mu.Lock()
 		q.inFlight[lease.Receipt] = job
 		q.mu.Unlock()
@@ -84,6 +85,8 @@ func (q *InProcessJobQueue) Retry(ctx context.Context, lease JobLease, _ string,
 	if !ok {
 		return ErrJobLeaseNotFound
 	}
+
+	job.Attempt++
 
 	if nextDelay <= 0 {
 		return q.Enqueue(ctx, job)

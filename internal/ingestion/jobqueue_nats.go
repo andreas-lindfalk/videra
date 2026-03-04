@@ -132,12 +132,17 @@ func (q *NATSJetStreamJobQueue) Reserve(_ context.Context, wait time.Duration) (
 		return JobEnvelope{}, JobLease{}, false, err
 	}
 
+	attempt := 1
+	if meta, metaErr := msg.Metadata(); metaErr == nil && meta != nil && meta.NumDelivered > 0 {
+		attempt = int(meta.NumDelivered)
+	}
+
 	receipt := fmt.Sprintf("%s:%d", job.JobID, time.Now().UnixNano())
 	q.mu.Lock()
 	q.inFlight[receipt] = msg
 	q.mu.Unlock()
 
-	lease := JobLease{JobID: job.JobID, Receipt: receipt, LeasedUntil: time.Now().UTC()}
+	lease := JobLease{JobID: job.JobID, Receipt: receipt, Attempt: attempt, LeasedUntil: time.Now().UTC()}
 	return job, lease, true, nil
 }
 

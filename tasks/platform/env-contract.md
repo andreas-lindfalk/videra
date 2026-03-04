@@ -24,9 +24,13 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_REMOTE_FETCH_TIMEOUT_SEC` (default `60`)
 - `VIDERA_REMOTE_FETCH_MAX_MB` (default `200`)
 
-## Async Queue Backend Contract (Phase 11 Spike)
+## Async Queue Runtime Contract (Phase 12)
 
 - `VIDERA_JOBQUEUE_BACKEND` (`inprocess|nats|redis`, default `inprocess`)
+- `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`, default `all`)
+- `VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS` (default `3`)
+- `VIDERA_JOBQUEUE_RETRY_BACKOFF_MS` (default `250`)
+- `VIDERA_JOBQUEUE_WORKER_POLL_MS` (default `250`)
 
 NATS JetStream options:
 
@@ -34,6 +38,7 @@ NATS JetStream options:
 - `VIDERA_JOBQUEUE_NATS_STREAM` (default `videra_index_jobs`)
 - `VIDERA_JOBQUEUE_NATS_SUBJECT` (default `videra.index.jobs`)
 - `VIDERA_JOBQUEUE_NATS_CONSUMER` (default `videra-index-worker`)
+- `VIDERA_JOBSTATE_NATS_BUCKET` (default `videra_index_job_status`)
 
 Redis Streams options:
 
@@ -43,11 +48,13 @@ Redis Streams options:
 - `VIDERA_JOBQUEUE_REDIS_STREAM` (default `videra:index:jobs`)
 - `VIDERA_JOBQUEUE_REDIS_GROUP` (default `videra-index-workers`)
 - `VIDERA_JOBQUEUE_REDIS_CONSUMER` (default `videra-index-worker`)
+- `VIDERA_JOBSTATE_REDIS_PREFIX` (default `videra:index:jobstatus:`)
 
 Notes:
 
 - Queue payloads are lightweight job instructions (`jobId`, source reference, attempts), not media bytes.
-- Default behavior remains `inprocess`; external backends are non-default spike paths.
+- `all` role runs MCP API + worker in one process; `api` and `worker` roles split responsibilities across processes.
+- `api|worker` split requires an external backend (`nats` or `redis`); `inprocess` remains all-in-one local default.
 
 Notes:
 - In `real` mode, ingestion first looks for sidecar transcript files (`.srt`/`.vtt`/`.txt`).

@@ -28,6 +28,14 @@ const (
 	JobQueueBackendRedis     JobQueueBackend = "redis"
 )
 
+type JobQueueRole string
+
+const (
+	JobQueueRoleAll    JobQueueRole = "all"
+	JobQueueRoleAPI    JobQueueRole = "api"
+	JobQueueRoleWorker JobQueueRole = "worker"
+)
+
 type Config struct {
 	Transport             Transport
 	HTTPAddr              string
@@ -44,16 +52,22 @@ type Config struct {
 	SearchAudioWeight     float64
 	SearchVisualWeight    float64
 	JobQueueBackend       JobQueueBackend
+	JobQueueRole          JobQueueRole
+	JobQueueRetryMax      int
+	JobQueueRetryBackoff  int
+	JobQueueWorkerPollMS  int
 	JobQueueNATSURL       string
 	JobQueueNATSStream    string
 	JobQueueNATSSubject   string
 	JobQueueNATSConsumer  string
+	JobStateNATSBucket    string
 	JobQueueRedisAddr     string
 	JobQueueRedisPassword string
 	JobQueueRedisDB       int
 	JobQueueRedisStream   string
 	JobQueueRedisGroup    string
 	JobQueueRedisConsumer string
+	JobStateRedisPrefix   string
 }
 
 func Load() (Config, error) {
@@ -73,16 +87,22 @@ func Load() (Config, error) {
 		SearchAudioWeight:     1.0,
 		SearchVisualWeight:    1.0,
 		JobQueueBackend:       JobQueueBackendInProcess,
+		JobQueueRole:          JobQueueRoleAll,
+		JobQueueRetryMax:      3,
+		JobQueueRetryBackoff:  250,
+		JobQueueWorkerPollMS:  250,
 		JobQueueNATSURL:       "nats://127.0.0.1:4222",
 		JobQueueNATSStream:    "videra_index_jobs",
 		JobQueueNATSSubject:   "videra.index.jobs",
 		JobQueueNATSConsumer:  "videra-index-worker",
+		JobStateNATSBucket:    "videra_index_job_status",
 		JobQueueRedisAddr:     "127.0.0.1:6379",
 		JobQueueRedisPassword: "",
 		JobQueueRedisDB:       0,
 		JobQueueRedisStream:   "videra:index:jobs",
 		JobQueueRedisGroup:    "videra-index-workers",
 		JobQueueRedisConsumer: "videra-index-worker",
+		JobStateRedisPrefix:   "videra:index:jobstatus:",
 	}
 
 	if value, ok := os.LookupEnv("VIDERA_TRANSPORT"); ok {
@@ -152,6 +172,24 @@ func Load() (Config, error) {
 	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_BACKEND"); ok {
 		cfg.JobQueueBackend = JobQueueBackend(strings.ToLower(strings.TrimSpace(value)))
 	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_ROLE"); ok {
+		cfg.JobQueueRole = JobQueueRole(strings.ToLower(strings.TrimSpace(value)))
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.JobQueueRetryMax); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS: %w", err)
+		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_RETRY_BACKOFF_MS"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.JobQueueRetryBackoff); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_JOBQUEUE_RETRY_BACKOFF_MS: %w", err)
+		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_WORKER_POLL_MS"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.JobQueueWorkerPollMS); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_JOBQUEUE_WORKER_POLL_MS: %w", err)
+		}
+	}
 	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_NATS_URL"); ok {
 		cfg.JobQueueNATSURL = strings.TrimSpace(value)
 	}
@@ -163,6 +201,9 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_NATS_CONSUMER"); ok {
 		cfg.JobQueueNATSConsumer = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBSTATE_NATS_BUCKET"); ok {
+		cfg.JobStateNATSBucket = strings.TrimSpace(value)
 	}
 	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_ADDR"); ok {
 		cfg.JobQueueRedisAddr = strings.TrimSpace(value)
@@ -183,6 +224,9 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_REDIS_CONSUMER"); ok {
 		cfg.JobQueueRedisConsumer = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_JOBSTATE_REDIS_PREFIX"); ok {
+		cfg.JobStateRedisPrefix = strings.TrimSpace(value)
 	}
 
 	if cfg.Transport != TransportStdio && cfg.Transport != TransportHTTP {
@@ -224,6 +268,18 @@ func Load() (Config, error) {
 	if cfg.JobQueueBackend != JobQueueBackendInProcess && cfg.JobQueueBackend != JobQueueBackendNATS && cfg.JobQueueBackend != JobQueueBackendRedis {
 		return Config{}, fmt.Errorf("unsupported VIDERA_JOBQUEUE_BACKEND: %s", cfg.JobQueueBackend)
 	}
+	if cfg.JobQueueRole != JobQueueRoleAll && cfg.JobQueueRole != JobQueueRoleAPI && cfg.JobQueueRole != JobQueueRoleWorker {
+		return Config{}, fmt.Errorf("unsupported VIDERA_JOBQUEUE_ROLE: %s", cfg.JobQueueRole)
+	}
+	if cfg.JobQueueRetryMax <= 0 {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS must be > 0")
+	}
+	if cfg.JobQueueRetryBackoff < 0 {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_RETRY_BACKOFF_MS must be >= 0")
+	}
+	if cfg.JobQueueWorkerPollMS <= 0 {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_WORKER_POLL_MS must be > 0")
+	}
 	if cfg.JobQueueNATSURL == "" {
 		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_NATS_URL cannot be empty")
 	}
@@ -235,6 +291,9 @@ func Load() (Config, error) {
 	}
 	if cfg.JobQueueNATSConsumer == "" {
 		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_NATS_CONSUMER cannot be empty")
+	}
+	if cfg.JobStateNATSBucket == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBSTATE_NATS_BUCKET cannot be empty")
 	}
 	if cfg.JobQueueRedisAddr == "" {
 		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_ADDR cannot be empty")
@@ -250,6 +309,12 @@ func Load() (Config, error) {
 	}
 	if cfg.JobQueueRedisConsumer == "" {
 		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_REDIS_CONSUMER cannot be empty")
+	}
+	if cfg.JobStateRedisPrefix == "" {
+		return Config{}, fmt.Errorf("VIDERA_JOBSTATE_REDIS_PREFIX cannot be empty")
+	}
+	if cfg.JobQueueBackend == JobQueueBackendInProcess && cfg.JobQueueRole != JobQueueRoleAll {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_ROLE=%s requires an external queue backend", cfg.JobQueueRole)
 	}
 
 	return cfg, nil

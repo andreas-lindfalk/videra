@@ -16,6 +16,7 @@ type JobEnvelope struct {
 type JobLease struct {
 	JobID       string
 	Receipt     string
+	Attempt     int
 	LeasedUntil time.Time
 }
 

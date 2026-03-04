@@ -27,8 +27,8 @@ Scoring: 1 (weak) to 5 (strong), based on Videra constraints in `AGENTS.md`.
 ## Recommendation
 
 1. Keep in-process queueing as default baseline until explicit scale/SLO pressure appears.
-2. Use **NATS JetStream** as first external broker candidate when queueing is a dedicated concern.
-3. Prefer **Redis Streams** first when Redis is already required for adjacent key/value workloads and reducing moving parts is a higher priority than broker specialization.
+2. Prefer **Redis Streams** first when Redis is already required for adjacent key/value workloads and reducing moving parts is a higher priority than broker specialization.
+3. Use **NATS JetStream** when queueing is a dedicated concern and broker specialization is preferred over stack consolidation.
 4. Keep the non-selected option as a portability fallback path.
 
 ## Fallback and Portability Plan
@@ -71,3 +71,14 @@ Phase 10 decision: **No broker integration yet**. Proceed with documentation + i
 	- `TestNATSJetStreamJobQueueContractIntegration`
 	- `TestRedisStreamsJobQueueContractIntegration`
 - Both backends passed baseline contract behaviors (`enqueue`, `reserve`, `ack`, `retry`, `fail`, duplicate enqueue handling) with real containers.
+
+## Phase 12 Hardening Notes (Validated)
+
+- Added runtime role split: `all` (API + worker), `api` (enqueue/status only), `worker` (queue processor only).
+- Added deterministic async retry policy controls (`retry max attempts`, `backoff ms`, `worker poll ms`) and terminal failure semantics.
+- Added shared job-state backends so `get_index_job` works across split processes:
+	- Redis key-prefix state store
+	- NATS JetStream KV state store
+- Added integration proof for split-role processing with Redis backend:
+	- `TestIndexVideoAsyncSplitRoleRedisLifecycle`
+- Split-role startup is guarded: `api|worker` requires external queue backend; `inprocess` remains local all-in-one mode.

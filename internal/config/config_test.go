@@ -35,6 +35,10 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.Equal(t, 60, cfg.RemoteFetchTimeout)
 	require.Equal(t, 200, cfg.RemoteFetchMaxMB)
 	require.Equal(t, JobQueueBackendInProcess, cfg.JobQueueBackend)
+	require.Equal(t, JobQueueRoleAll, cfg.JobQueueRole)
+	require.Equal(t, 3, cfg.JobQueueRetryMax)
+	require.Equal(t, 250, cfg.JobQueueRetryBackoff)
+	require.Equal(t, 250, cfg.JobQueueWorkerPollMS)
 }
 
 func TestLoadInvalidTransportStillFails(t *testing.T) {
@@ -75,6 +79,38 @@ func TestLoadInvalidJobQueueBackendFails(t *testing.T) {
 	_, err := Load()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported VIDERA_JOBQUEUE_BACKEND")
+}
+
+func TestLoadInvalidJobQueueRoleFails(t *testing.T) {
+	t.Setenv("VIDERA_JOBQUEUE_ROLE", "scheduler")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported VIDERA_JOBQUEUE_ROLE")
+}
+
+func TestLoadSplitRoleWithInProcessBackendFails(t *testing.T) {
+	t.Setenv("VIDERA_JOBQUEUE_BACKEND", "inprocess")
+	t.Setenv("VIDERA_JOBQUEUE_ROLE", "api")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "requires an external queue backend")
+}
+
+func TestLoadParsesQueueRoleAndRetrySettings(t *testing.T) {
+	t.Setenv("VIDERA_JOBQUEUE_BACKEND", "redis")
+	t.Setenv("VIDERA_JOBQUEUE_ROLE", "worker")
+	t.Setenv("VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS", "5")
+	t.Setenv("VIDERA_JOBQUEUE_RETRY_BACKOFF_MS", "125")
+	t.Setenv("VIDERA_JOBQUEUE_WORKER_POLL_MS", "50")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, JobQueueRoleWorker, cfg.JobQueueRole)
+	require.Equal(t, 5, cfg.JobQueueRetryMax)
+	require.Equal(t, 125, cfg.JobQueueRetryBackoff)
+	require.Equal(t, 50, cfg.JobQueueWorkerPollMS)
 }
 
 func TestLoadParsesRedisJobQueueDB(t *testing.T) {

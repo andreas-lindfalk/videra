@@ -161,3 +161,9 @@
 
 - **Prefer fewer moving parts when capabilities overlap.** If Redis is already required for key/value workloads, Redis Streams can be the pragmatic first queue backend to reduce operational surface area.
 - **Keep portability through shared queue contracts.** Even when choosing Redis for consolidation, maintain parity-tested adapters so NATS remains a viable fallback path.
+
+## 2026-03-04 — Split Role Async Hardening
+
+- **Separate API and worker roles via explicit runtime contract.** A dedicated `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`) avoids accidental coupling and clarifies deployment topology.
+- **Persist async job status outside process memory for split deployments.** `get_index_job` must read from a shared backend (Redis prefix store or NATS KV) when API and worker run in separate processes.
+- **Queue retry budget should be lifecycle-visible.** Terminal failure messages should include attempt exhaustion semantics so operators can distinguish transient retries from permanent failure.

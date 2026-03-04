@@ -201,7 +201,11 @@ func TestSyncIndexOrchestratorRunAsyncFailurePersistsStatus(t *testing.T) {
 	ingester := &fakeIngester{results: []struct {
 		video storage.Video
 		err   error
-	}{{err: errors.New("boom")}}}
+	}{
+		{err: errors.New("boom")},
+		{err: errors.New("boom")},
+		{err: errors.New("boom")},
+	}}
 	orchestrator := NewSyncIndexOrchestrator(ingester, lookup)
 	req := NewIndexJobRequest("/missing/video.mp4", IndexModeAsync)
 
@@ -211,7 +215,63 @@ func TestSyncIndexOrchestratorRunAsyncFailurePersistsStatus(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		job, ok := orchestrator.GetJob(context.Background(), req.JobID)
-		return ok && job.Status == IndexJobStatusFailed && job.Error == "boom"
+		return ok && job.Status == IndexJobStatusFailed && job.Error == "index job failed after 3 attempts: boom"
 	}, 2*time.Second, 20*time.Millisecond)
-	require.Equal(t, 2, ingester.Calls())
+	require.Equal(t, 3, ingester.Calls())
+}
+
+func TestSyncIndexOrchestratorRunWorkerProcessesQueuedJobs(t *testing.T) {
+	lookup := &fakeLookup{videos: map[string]storage.Video{}}
+	ingester := &fakeIngester{results: []struct {
+		video storage.Video
+		err   error
+	}{{video: storage.Video{ID: "v-worker", FilePath: "https://example.com/worker.mp4"}}}}
+	orchestrator := NewSyncIndexOrchestratorWithOptions(ingester, lookup, NewInProcessJobQueue(16), SyncIndexOrchestratorOptions{
+		RunInlineAsyncWorker: false,
+		AsyncRetryBackoff:    1 * time.Millisecond,
+		WorkerPollInterval:   1 * time.Millisecond,
+	})
+	req := NewIndexJobRequest("https://example.com/worker.mp4", IndexModeAsync)
+
+	result, err := orchestrator.Run(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, IndexJobStatusPending, result.Status)
+
+	workerCtx, cancel := context.WithCancel(context.Background())
+	workerDone := make(chan error, 1)
+	go func() {
+		workerDone <- orchestrator.RunWorker(workerCtx)
+	}()
+
+	require.Eventually(t, func() bool {
+		job, ok := orchestrator.GetJob(context.Background(), req.JobID)
+		return ok && job.Status == IndexJobStatusCompleted && job.Video != nil && job.Video.ID == "v-worker"
+	}, 2*time.Second, 20*time.Millisecond)
+
+	cancel()
+	require.NoError(t, <-workerDone)
+	require.Equal(t, 1, ingester.Calls())
+}
+
+func TestSyncIndexOrchestratorRunWorkerStopsOnCancel(t *testing.T) {
+	orchestrator := NewSyncIndexOrchestratorWithOptions(
+		&fakeIngester{results: []struct {
+			video storage.Video
+			err   error
+		}{{video: storage.Video{ID: "unused"}}}},
+		&fakeLookup{videos: map[string]storage.Video{}},
+		NewInProcessJobQueue(4),
+		SyncIndexOrchestratorOptions{RunInlineAsyncWorker: false, WorkerPollInterval: 5 * time.Millisecond},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- orchestrator.RunWorker(ctx)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+
+	require.NoError(t, <-done)
 }

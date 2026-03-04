@@ -90,6 +90,42 @@ func startVideraContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, 
 	return ctr, cli
 }
 
+func startVideraWorkerContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int) testcontainers.Container {
+	t.Helper()
+
+	testcontainers.SkipIfProviderIsNotHealthy(t)
+
+	env := map[string]string{
+		"VIDERA_RUNTIME_MODE":  "test",
+		"VIDERA_TRANSPORT":     "stdio",
+		"VIDERA_JOBQUEUE_ROLE": "worker",
+	}
+	for key, value := range envOverrides {
+		env[key] = value
+	}
+
+	customizers := []testcontainers.ContainerCustomizer{
+		testcontainers.WithDockerfile(testcontainers.FromDockerfile{
+			Context:    "../..",
+			Dockerfile: "Dockerfile",
+			Repo:       "videra-integration",
+			Tag:        "latest",
+			KeepImage:  true,
+		}),
+		testcontainers.WithEnv(env),
+		testcontainers.WithWaitStrategy(wait.ForLog("queue worker started")),
+	}
+	if len(hostPorts) > 0 {
+		customizers = append(customizers, testcontainers.WithHostPortAccess(hostPorts...))
+	}
+
+	ctr, err := testcontainers.Run(ctx, "", customizers...)
+	testcontainers.CleanupContainer(t, ctr)
+	require.NoError(t, err)
+
+	return ctr
+}
+
 func resetIndex(t *testing.T, ctx context.Context, cli *client.Client) {
 	t.Helper()
 
