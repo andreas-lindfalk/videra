@@ -6,6 +6,12 @@ Privacy-native multimodal video memory MCP server in Go.
 
 This is the recommended pre-CloudRun validation path.
 
+Fastest path (assuming a file exists in `./videos`):
+
+```bash
+make local-e2e QUERY="test clip"
+```
+
 ### 1) Start local MCP HTTP service
 
 ```bash
@@ -18,10 +24,31 @@ This starts the service on `http://localhost:8080/mcp`.
 
 Mount a local folder into the container as `/videos` by setting `VIDERA_VIDEO_DIR`.
 
+Quickest default flow (uses first video in `./videos`):
+
+```bash
+make local-smoke-default QUERY="budget roadmap"
+```
+
+Practical first-test flow (repo-local `./videos` folder):
+
+```bash
+mkdir -p videos
+# put a file in ./videos, for example: ./videos/IMG_3711.MOV
+make local-up
+make local-smoke-default QUERY="test clip"
+make local-down
+```
+
+By default, local media in `videos/` is ignored by Git (`videos/*` with `videos/.gitkeep` allowed).
+
 ```bash
 VIDERA_VIDEO_DIR=/absolute/path/to/your/video/folder make local-up
 make local-smoke VIDEO=/videos/your-file.mp4 QUERY="budget roadmap"
 ```
+
+If you do not set `VIDERA_VIDEO_DIR`, compose mounts the repo root (`.`) to `/videos`.
+So a file at `./videos/IMG_3711.MOV` is visible in-container as `/videos/videos/IMG_3711.MOV`.
 
 The smoke command validates this full flow:
 
@@ -35,6 +62,16 @@ The smoke command validates this full flow:
 ```bash
 make local-down
 ```
+
+## VS Code MCP Setup (Simple)
+
+A workspace config is included at `.vscode/mcp.json` pointing to `http://localhost:8080/mcp`.
+
+Practical flow:
+
+1. Run `make local-up` (or `make local-e2e`).
+2. In VS Code/Copilot MCP settings, enable/use the workspace server config.
+3. Test with MCP tools: `list_videos`, then `search_video`.
 
 ## Developer Commands
 

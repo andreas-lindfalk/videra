@@ -1,4 +1,4 @@
-.PHONY: build test integration-test docker-build run-stdio run-http local-up local-down local-smoke
+.PHONY: build test integration-test docker-build run-stdio run-http local-up local-down local-smoke local-smoke-default local-e2e
 
 build:
 	go build -o bin/videra ./cmd/videra
@@ -29,6 +29,26 @@ local-smoke:
 		echo "Usage: make local-smoke VIDEO=/videos/<file>.mp4 [QUERY='budget roadmap'] [ENDPOINT=http://localhost:8080/mcp]"; \
 		exit 1; \
 	fi
-	@ENDPOINT_VALUE="${ENDPOINT:-http://localhost:8080/mcp}"; \
-	QUERY_VALUE="${QUERY:-budget roadmap}"; \
-	go run ./cmd/localsmoke --endpoint "$$ENDPOINT_VALUE" --video "$(VIDEO)" --query "$$QUERY_VALUE"
+	@go run ./cmd/localsmoke \
+		--endpoint "$(or $(ENDPOINT),http://localhost:8080/mcp)" \
+		--video "$(VIDEO)" \
+		--query "$(or $(QUERY),budget roadmap)"
+
+local-smoke-default:
+	@if [ ! -d "./videos" ]; then \
+		echo "Missing ./videos folder. Create it and place a video file inside."; \
+		exit 1; \
+	fi
+	@VIDEO_FILE="$$(find ./videos -maxdepth 1 -type f \( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.m4v' -o -iname '*.mkv' \) | head -n 1)"; \
+	if [ -z "$$VIDEO_FILE" ]; then \
+		echo "No local video found in ./videos (supported: .mov, .mp4, .m4v, .mkv)"; \
+		echo "Place a file in ./videos and run make local-smoke-default again."; \
+		exit 1; \
+	fi; \
+	BASENAME="$$(basename "$$VIDEO_FILE")"; \
+	echo "Using ./videos/$$BASENAME"; \
+	$(MAKE) local-smoke VIDEO="/videos/videos/$$BASENAME" QUERY="$(or $(QUERY),budget roadmap)" ENDPOINT="$(or $(ENDPOINT),http://localhost:8080/mcp)"
+
+local-e2e: local-up local-smoke-default
+	@echo "Local MCP server is running at http://localhost:8080/mcp"
+	@echo "Stop it with: make local-down"
