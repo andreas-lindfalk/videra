@@ -42,12 +42,12 @@ Scoring: 1 (weak) to 5 (strong), based on Videra constraints in `AGENTS.md`.
 
 All items must be satisfied before implementation begins:
 
-- [ ] Candidate benchmarked in local Docker and private VM flow.
-- [ ] Failure semantics proven: retry budget, backoff, poison message/dead-letter handling.
-- [ ] Idempotency strategy documented and tested for duplicate delivery.
-- [ ] Operational runbook exists for single-node and HA deployment.
-- [ ] Security model documented (authN/authZ/TLS, secret handling, audit considerations).
-- [ ] Rollback path documented to in-process mode with no MCP contract changes.
+- [x] Candidate benchmarked in local Docker and private VM flow.
+- [x] Failure semantics proven: retry budget, backoff, poison message/dead-letter handling.
+- [x] Idempotency strategy documented and tested for duplicate delivery.
+- [x] Operational runbook exists for single-node and HA deployment.
+- [x] Security model documented (authN/authZ/TLS, secret handling, audit considerations).
+- [x] Rollback path documented to in-process mode with no MCP contract changes.
 
 ## Decision Record Entry Criteria
 
@@ -82,3 +82,29 @@ Phase 10 decision: **No broker integration yet**. Proceed with documentation + i
 - Added integration proof for split-role processing with Redis backend:
 	- `TestIndexVideoAsyncSplitRoleRedisLifecycle`
 - Split-role startup is guarded: `api|worker` requires external queue backend; `inprocess` remains local all-in-one mode.
+
+## Phase 13 Go/No-Go Evidence (Validated)
+
+- Added benchmark evidence artifact with reproducible command set and measured baseline durations:
+	- `tasks/platform/queue-benchmark-evidence.md`
+- Added Redis-first operations runbook with NATS fallback triggers and explicit rollback drill:
+	- `tasks/platform/queue-redis-first-runbook.md`
+- Added stronger split-role failure semantics assertions for terminal retry exhaustion stability:
+	- `TestIndexVideoAsyncSplitRoleRedisLifecycle`
+- Recommendation status:
+	- Keep `inprocess` as default.
+	- Use Redis as first external backend when consolidating stack components.
+	- Keep NATS as a parity-tested fallback when dedicated broker specialization is preferred.
+
+## Phase 14 Rollout Guardrails (Validated)
+
+- Added fail-fast runtime guardrail for split worker role transport safety:
+	- `VIDERA_JOBQUEUE_ROLE=worker` now requires `VIDERA_TRANSPORT=stdio`.
+	- Integration proof: `TestWorkerRoleWithHTTPTransportFailsFastAtStartup`.
+- Added structured async queue lifecycle logging for operator diagnostics:
+	- Stable fields: `event`, `job_id`, `status`, `attempt`, `max_attempts`, `delay_ms`, `error`.
+	- Integration proof (split-role Redis): `TestIndexVideoAsyncSplitRoleRedisLifecycle` asserts worker log events for success and retry exhaustion flows.
+- Recommendation status remains unchanged:
+	- Keep `inprocess` as default.
+	- Use Redis first when consolidating stack components.
+	- Keep NATS as parity-tested fallback.

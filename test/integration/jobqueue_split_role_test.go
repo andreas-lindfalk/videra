@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestIndexVideoAsyncSplitRoleRedisLifecycle(t *testing.T) {
 
 	workerEnv := cloneEnvMap(sharedEnv)
 	workerEnv["VIDERA_JOBQUEUE_ROLE"] = "worker"
-	_ = startVideraWorkerContainerWithEnvAndHostPorts(t, ctx, workerEnv, nil)
+	workerContainer := startVideraWorkerContainerWithEnvAndHostPorts(t, ctx, workerEnv, nil)
 
 	_, cli := startVideraContainerWithEnvAndHostPorts(t, ctx, sharedEnv, nil)
 	resetIndex(t, ctx, cli)
@@ -93,6 +94,32 @@ func TestIndexVideoAsyncSplitRoleRedisLifecycle(t *testing.T) {
 	errorText, ok := failedJobPayload["error"].(string)
 	require.True(t, ok)
 	require.Contains(t, errorText, "failed after 2 attempts")
+
+	time.Sleep(200 * time.Millisecond)
+
+	failedStatusCheck, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "get_index_job",
+			Arguments: map[string]any{
+				"jobId": failJobID,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, failedStatusCheck.IsError)
+	failedStatusPayload, ok := failedStatusCheck.StructuredContent.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "failed", failedStatusPayload["status"])
+	require.Equal(t, errorText, failedStatusPayload["error"])
+	_, hasVideoID := failedStatusPayload["videoId"]
+	require.False(t, hasVideoID)
+
+	require.Eventually(t, func() bool {
+		logs := readContainerLogs(t, ctx, workerContainer)
+		return strings.Contains(logs, "queue_lifecycle event=completed job_id="+jobID) &&
+			strings.Contains(logs, "queue_lifecycle event=retry_scheduled job_id="+failJobID) &&
+			strings.Contains(logs, "queue_lifecycle event=retry_exhausted job_id="+failJobID)
+	}, 5*time.Second, 100*time.Millisecond)
 }
 
 func cloneEnvMap(input map[string]string) map[string]string {

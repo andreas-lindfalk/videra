@@ -167,3 +167,15 @@
 - **Separate API and worker roles via explicit runtime contract.** A dedicated `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`) avoids accidental coupling and clarifies deployment topology.
 - **Persist async job status outside process memory for split deployments.** `get_index_job` must read from a shared backend (Redis prefix store or NATS KV) when API and worker run in separate processes.
 - **Queue retry budget should be lifecycle-visible.** Terminal failure messages should include attempt exhaustion semantics so operators can distinguish transient retries from permanent failure.
+
+## 2026-03-04 — Queue Go/No-Go Evidence Discipline
+
+- **Benchmark artifacts should include exact commands and measured outputs, not qualitative claims.** Reproducibility matters more than broad performance wording.
+- **Split-role validation must separate control-plane and data-plane assertions.** `get_index_job` can be shared-state correct even when API-visible indexed data depends on storage topology decisions.
+- **Rollback confidence should be tested as a first-class path.** Keeping in-process async lifecycle tests passing is part of external-queue readiness, not an afterthought.
+
+## 2026-03-04 — Queue Rollout Guardrails & Observability
+
+- **Worker-only role needs explicit transport semantics.** Enforce `VIDERA_TRANSPORT=stdio` for `VIDERA_JOBQUEUE_ROLE=worker` so invalid API-mode assumptions fail at startup instead of at runtime.
+- **Lifecycle logs need stable keys before rollout.** A fixed `queue_lifecycle` schema (`event`, `job_id`, `status`, `attempt`, `max_attempts`, `delay_ms`, `error`) makes ops dashboards and incident triage durable across refactors.
+- **Observability should be integration-proven, not assumed.** Split-role tests should assert worker logs for both success and retry-exhausted paths to validate operator visibility under real container wiring.

@@ -55,6 +55,10 @@ Notes:
 - Queue payloads are lightweight job instructions (`jobId`, source reference, attempts), not media bytes.
 - `all` role runs MCP API + worker in one process; `api` and `worker` roles split responsibilities across processes.
 - `api|worker` split requires an external backend (`nats` or `redis`); `inprocess` remains all-in-one local default.
+- `worker` role requires `VIDERA_TRANSPORT=stdio`; startup fails fast if transport is configured as HTTP.
+- Async worker lifecycle emits structured `queue_lifecycle` logs with stable keys: `event`, `job_id`, `status`, `attempt`, `max_attempts`, `delay_ms`, `error`.
+- Redis-first rollout operations and rollback drills are documented in `tasks/platform/queue-redis-first-runbook.md`.
+- Reproducible queue evidence baselines are tracked in `tasks/platform/queue-benchmark-evidence.md`.
 
 Notes:
 - In `real` mode, ingestion first looks for sidecar transcript files (`.srt`/`.vtt`/`.txt`).

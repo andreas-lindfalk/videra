@@ -176,9 +176,25 @@ Role notes:
 - `all` runs MCP API + worker loop in one process.
 - `api` runs MCP API only (enqueue + `get_index_job` reads shared job-state backend).
 - `worker` runs queue processing only (no MCP endpoint).
+- `worker` role is startup-validated to require `VIDERA_TRANSPORT=stdio` (fail-fast on invalid transport config).
 - `api|worker` split requires an external queue backend (`nats` or `redis`); `inprocess` is all-in-one only.
 
+Queue lifecycle observability keys (Phase 14):
+
+- Worker events are emitted as structured logs with prefix `queue_lifecycle`.
+- Stable fields: `event`, `job_id`, `status`, `attempt`, `max_attempts`, `delay_ms`, `error`.
+- Core events: `enqueued`, `reserved`, `retry_scheduled`, `completed`, `retry_exhausted`, `retry_failed_terminal`.
+
 Queue payloads are job instructions (source reference + job metadata), not video bytes.
+
+Redis-first rollout guidance:
+
+- Keep `inprocess` as default unless explicit scale/SLO pressure requires external queueing.
+- Prefer Redis as first external backend when stack consolidation is a priority.
+- Prefer NATS when dedicated broker specialization is desired over consolidation.
+- Use Phase 13 operational guidance and fallback drills in:
+	- `tasks/platform/queue-redis-first-runbook.md`
+	- `tasks/platform/queue-benchmark-evidence.md`
 
 ## Troubleshooting
 

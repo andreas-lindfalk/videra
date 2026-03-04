@@ -118,6 +118,7 @@ func (o *SyncIndexOrchestrator) Run(ctx context.Context, req IndexJobRequest) (I
 		if err := o.queue.Enqueue(ctx, envelope); err != nil {
 			return IndexJobResult{}, err
 		}
+		logQueueLifecycle("enqueued", req.JobID, 0, envelope.MaxAttempts, IndexJobStatusPending, "", 0)
 
 		pending := IndexJobResult{JobID: req.JobID, Status: IndexJobStatusPending}
 		if err := o.setJob(ctx, pending); err != nil {
@@ -204,18 +205,6 @@ func (o *SyncIndexOrchestrator) processReservedJob(ctx context.Context, queued J
 	request := requestFromJobEnvelope(queued)
 	request.Mode = IndexModeSync
 
-	result := o.runSyncWithAttempts(ctx, request, 1)
-	if result.Status == IndexJobStatusCompleted {
-		if err := o.setJob(ctx, result); err != nil {
-			log.Printf("job state set failed for completed job %s: %v", result.JobID, err)
-		}
-		if err := o.queue.Ack(ctx, lease); err != nil {
-			log.Printf("job ack failed for %s: %v", lease.JobID, err)
-		}
-		log.Printf("async job completed job_id=%s attempt=%d", lease.JobID, lease.Attempt)
-		return
-	}
-
 	attempt := lease.Attempt
 	if attempt <= 0 {
 		attempt = queued.Attempt + 1
@@ -224,6 +213,20 @@ func (o *SyncIndexOrchestrator) processReservedJob(ctx context.Context, queued J
 	maxAttempts := queued.MaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = o.asyncRetryMax
+	}
+	logQueueLifecycle("reserved", queued.JobID, attempt, maxAttempts, "processing", "", 0)
+
+	result := o.runSyncWithAttempts(ctx, request, 1)
+	if result.Status == IndexJobStatusCompleted {
+		if err := o.setJob(ctx, result); err != nil {
+			log.Printf("job state set failed for completed job %s: %v", result.JobID, err)
+		}
+		if err := o.queue.Ack(ctx, lease); err != nil {
+			log.Printf("job ack failed for %s: %v", lease.JobID, err)
+		}
+		logQueueLifecycle("completed", lease.JobID, attempt, maxAttempts, IndexJobStatusCompleted, "", 0)
+		log.Printf("async job completed job_id=%s attempt=%d", lease.JobID, lease.Attempt)
+		return
 	}
 
 	if attempt < maxAttempts {
@@ -240,6 +243,7 @@ func (o *SyncIndexOrchestrator) processReservedJob(ctx context.Context, queued J
 			if setErr := o.setJob(ctx, terminal); setErr != nil {
 				log.Printf("job state set failed for terminal retry failure %s: %v", terminal.JobID, setErr)
 			}
+			logQueueLifecycle("retry_failed_terminal", queued.JobID, attempt, maxAttempts, IndexJobStatusFailed, terminal.Error, 0)
 			log.Printf("async job failed job_id=%s attempt=%d reason=%s", queued.JobID, attempt, terminal.Error)
 			return
 		}
@@ -258,6 +262,7 @@ func (o *SyncIndexOrchestrator) processReservedJob(ctx context.Context, queued J
 				o.processNextQueuedJob(context.Background())
 			}(delay)
 		}
+		logQueueLifecycle("retry_scheduled", queued.JobID, attempt, maxAttempts, IndexJobStatusPending, result.Error, delay)
 		log.Printf("async job retry scheduled job_id=%s attempt=%d/%d delay=%s", queued.JobID, attempt, maxAttempts, delay)
 		return
 	}
@@ -273,7 +278,21 @@ func (o *SyncIndexOrchestrator) processReservedJob(ctx context.Context, queued J
 	if err := o.setJob(ctx, terminal); err != nil {
 		log.Printf("job state set failed for terminal job %s: %v", queued.JobID, err)
 	}
+	logQueueLifecycle("retry_exhausted", queued.JobID, maxAttempts, maxAttempts, IndexJobStatusFailed, terminal.Error, 0)
 	log.Printf("async job exhausted retries job_id=%s attempts=%d", queued.JobID, maxAttempts)
+}
+
+func logQueueLifecycle(event, jobID string, attempt, maxAttempts int, status IndexJobStatus, errorText string, delay time.Duration) {
+	log.Printf(
+		"queue_lifecycle event=%s job_id=%s status=%s attempt=%d max_attempts=%d delay_ms=%d error=%q",
+		event,
+		strings.TrimSpace(jobID),
+		status,
+		attempt,
+		maxAttempts,
+		delay.Milliseconds(),
+		strings.TrimSpace(errorText),
+	)
 }
 
 func (o *SyncIndexOrchestrator) retryDelay(attempt int) time.Duration {

@@ -316,6 +316,9 @@ func Load() (Config, error) {
 	if cfg.JobQueueBackend == JobQueueBackendInProcess && cfg.JobQueueRole != JobQueueRoleAll {
 		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_ROLE=%s requires an external queue backend", cfg.JobQueueRole)
 	}
+	if cfg.JobQueueRole == JobQueueRoleWorker && cfg.Transport != TransportStdio {
+		return Config{}, fmt.Errorf("VIDERA_JOBQUEUE_ROLE=worker requires VIDERA_TRANSPORT=stdio")
+	}
 
 	return cfg, nil
 }

@@ -98,6 +98,16 @@ func TestLoadSplitRoleWithInProcessBackendFails(t *testing.T) {
 	require.Contains(t, err.Error(), "requires an external queue backend")
 }
 
+func TestLoadWorkerRoleWithHTTPTransportFails(t *testing.T) {
+	t.Setenv("VIDERA_JOBQUEUE_BACKEND", "redis")
+	t.Setenv("VIDERA_JOBQUEUE_ROLE", "worker")
+	t.Setenv("VIDERA_TRANSPORT", "http")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "VIDERA_JOBQUEUE_ROLE=worker requires VIDERA_TRANSPORT=stdio")
+}
+
 func TestLoadParsesQueueRoleAndRetrySettings(t *testing.T) {
 	t.Setenv("VIDERA_JOBQUEUE_BACKEND", "redis")
 	t.Setenv("VIDERA_JOBQUEUE_ROLE", "worker")

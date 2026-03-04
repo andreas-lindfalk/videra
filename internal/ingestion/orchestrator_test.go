@@ -1,8 +1,10 @@
 package ingestion
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
 	"sync"
 	"testing"
 	"time"
@@ -274,4 +276,25 @@ func TestSyncIndexOrchestratorRunWorkerStopsOnCancel(t *testing.T) {
 	cancel()
 
 	require.NoError(t, <-done)
+}
+
+func TestLogQueueLifecycleUsesStableFieldKeys(t *testing.T) {
+	var buffer bytes.Buffer
+	originalOutput := log.Writer()
+	log.SetOutput(&buffer)
+	t.Cleanup(func() {
+		log.SetOutput(originalOutput)
+	})
+
+	logQueueLifecycle("retry_scheduled", "job-123", 2, 3, IndexJobStatusPending, "transient boom", 150*time.Millisecond)
+	line := buffer.String()
+
+	require.Contains(t, line, "queue_lifecycle")
+	require.Contains(t, line, "event=retry_scheduled")
+	require.Contains(t, line, "job_id=job-123")
+	require.Contains(t, line, "status=pending")
+	require.Contains(t, line, "attempt=2")
+	require.Contains(t, line, "max_attempts=3")
+	require.Contains(t, line, "delay_ms=150")
+	require.Contains(t, line, `error="transient boom"`)
 }

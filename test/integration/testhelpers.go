@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/docker/go-connections/nat"
@@ -140,4 +141,18 @@ func resetIndex(t *testing.T, ctx context.Context, cli *client.Client) {
 	videos, ok := listResult.StructuredContent.([]any)
 	require.True(t, ok)
 	require.Len(t, videos, 0)
+}
+
+func readContainerLogs(t *testing.T, ctx context.Context, ctr testcontainers.Container) string {
+	t.Helper()
+
+	logReader, err := ctr.Logs(ctx)
+	require.NoError(t, err)
+	defer func() {
+		_ = logReader.Close()
+	}()
+
+	content, err := io.ReadAll(logReader)
+	require.NoError(t, err)
+	return string(content)
 }
