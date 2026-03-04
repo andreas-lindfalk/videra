@@ -48,8 +48,11 @@ func run() error {
 	}
 
 	indexOptions := ingestion.IndexOptions{
-		FrameIntervalSec: cfg.FrameIntervalSec,
-		Concurrency:      cfg.IndexConcurrency,
+		FrameIntervalSec:      cfg.FrameIntervalSec,
+		Concurrency:           cfg.IndexConcurrency,
+		RemoteFetchDisabled:   !cfg.RemoteFetchEnabled,
+		RemoteFetchTimeoutSec: cfg.RemoteFetchTimeout,
+		RemoteFetchMaxMB:      cfg.RemoteFetchMaxMB,
 	}
 
 	var ingester ingestion.Ingester

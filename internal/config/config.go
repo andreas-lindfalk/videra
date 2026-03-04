@@ -27,6 +27,9 @@ type Config struct {
 	LogLevel           string
 	RuntimeMode        string
 	IngestionMode      IngestionMode
+	RemoteFetchEnabled bool
+	RemoteFetchTimeout int
+	RemoteFetchMaxMB   int
 	FrameIntervalSec   int
 	DefaultSearchLimit int
 	IndexConcurrency   int
@@ -42,6 +45,9 @@ func Load() (Config, error) {
 		LogLevel:           "info",
 		RuntimeMode:        "local",
 		IngestionMode:      IngestionModeSimulated,
+		RemoteFetchEnabled: true,
+		RemoteFetchTimeout: 60,
+		RemoteFetchMaxMB:   200,
 		FrameIntervalSec:   5,
 		DefaultSearchLimit: 5,
 		IndexConcurrency:   4,
@@ -66,6 +72,27 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_INGESTION_MODE"); ok {
 		cfg.IngestionMode = IngestionMode(strings.ToLower(strings.TrimSpace(value)))
+	}
+	if value, ok := os.LookupEnv("VIDERA_REMOTE_FETCH_ENABLED"); ok {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		switch normalized {
+		case "true", "1", "yes", "on":
+			cfg.RemoteFetchEnabled = true
+		case "false", "0", "no", "off":
+			cfg.RemoteFetchEnabled = false
+		default:
+			return Config{}, fmt.Errorf("invalid VIDERA_REMOTE_FETCH_ENABLED: %s", value)
+		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_REMOTE_FETCH_TIMEOUT_SEC"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.RemoteFetchTimeout); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_REMOTE_FETCH_TIMEOUT_SEC: %w", err)
+		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_REMOTE_FETCH_MAX_MB"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.RemoteFetchMaxMB); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_REMOTE_FETCH_MAX_MB: %w", err)
+		}
 	}
 	if value, ok := os.LookupEnv("VIDERA_FRAME_INTERVAL_SEC"); ok {
 		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.FrameIntervalSec); err != nil {
@@ -116,6 +143,12 @@ func Load() (Config, error) {
 	}
 	if cfg.IngestionMode != IngestionModeSimulated && cfg.IngestionMode != IngestionModeReal {
 		return Config{}, fmt.Errorf("unsupported VIDERA_INGESTION_MODE: %s", cfg.IngestionMode)
+	}
+	if cfg.RemoteFetchTimeout <= 0 {
+		return Config{}, fmt.Errorf("VIDERA_REMOTE_FETCH_TIMEOUT_SEC must be > 0")
+	}
+	if cfg.RemoteFetchMaxMB <= 0 {
+		return Config{}, fmt.Errorf("VIDERA_REMOTE_FETCH_MAX_MB must be > 0")
 	}
 	if cfg.SearchAudioWeight <= 0 {
 		return Config{}, fmt.Errorf("VIDERA_SEARCH_AUDIO_WEIGHT must be > 0")

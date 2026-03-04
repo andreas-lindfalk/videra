@@ -8,6 +8,7 @@ Goal: deploy Videra as a managed HTTPS MCP endpoint on GCP Cloud Run with operat
 - Region: choose one region and keep it fixed per environment
 - Exposure: HTTPS endpoint managed by Cloud Run
 - MCP URL outcome: `https://<service-url>/mcp`
+- Indexing source strategy: remote HTTP(S) media URL (recommended for Cloud Run parity)
 
 Image profile guidance:
 
@@ -80,7 +81,7 @@ gcloud run deploy "${SERVICE}" \
   --max-instances 1 \
   --cpu 1 \
   --memory 2Gi \
-  --set-env-vars "VIDERA_TRANSPORT=http,VIDERA_HTTP_ADDR=:8080,VIDERA_DATA_DIR=/tmp/videra-data,VIDERA_LOG_LEVEL=info,VIDERA_RUNTIME_MODE=prod"
+  --set-env-vars "VIDERA_TRANSPORT=http,VIDERA_HTTP_ADDR=:8080,VIDERA_DATA_DIR=/tmp/videra-data,VIDERA_LOG_LEVEL=info,VIDERA_RUNTIME_MODE=prod,VIDERA_INGESTION_MODE=real,VIDERA_REMOTE_FETCH_ENABLED=true,VIDERA_REMOTE_FETCH_TIMEOUT_SEC=60,VIDERA_REMOTE_FETCH_MAX_MB=200"
 ```
 
 Get service URL:
@@ -105,23 +106,30 @@ From VS Code MCP config or MCP client, use:
 Run checks:
 
 1. `list_videos`
-2. `search_video`
-3. `read_resource` for `video://<id>/transcript` (if indexed data exists)
+2. `index_video` using remote HTTP(S) media URL
+3. `search_video`
+4. `read_resource` for `video://<id>/transcript` (if indexed data exists)
 
-## 7) Important current constraint (Phase 6)
+## 7) Cloud-ready indexing path (Phase 8)
 
-`index_video` currently expects a server-visible filesystem path.
+`index_video` accepts remote HTTP(S) media sources in `real` mode via bounded fetch.
 
-- On Hetzner VM, this maps naturally to mounted `/videos/...` paths.
-- On Cloud Run, local files are not persisted/shared and your laptop path is not directly accessible.
+- Recommended Cloud Run source: signed URL or authenticated proxy URL from object storage.
+- Keep source URL retry-safe and stable when you want idempotent re-index behavior.
 
-For parity today, treat Cloud Run runbook as endpoint/runtime validation and keep full indexing validation on Hetzner/local until cloud ingestion path is finalized.
+Example MCP call payload:
 
-Planned parity path:
+```json
+{
+  "path": "https://storage.example.com/videra/meeting-123.mp4?signature=..."
+}
+```
 
-- move cloud indexing to explicit async jobs,
-- source media from cloud object storage,
-- keep MCP contracts unchanged.
+Bounded fetch behavior is controlled by:
+
+- `VIDERA_REMOTE_FETCH_ENABLED`
+- `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`
+- `VIDERA_REMOTE_FETCH_MAX_MB`
 
 ## 8) Operational basics
 
@@ -151,6 +159,10 @@ gcloud run services describe "${SERVICE}" --region "${REGION}"
 - `404` or connection issues:
   - verify MCP URL includes `/mcp`
   - verify service deployed in expected region/project
+- `index_video` remote fetch fails:
+  - verify URL is reachable from Cloud Run runtime
+  - verify source returns HTTP `200`
+  - verify payload fits `VIDERA_REMOTE_FETCH_MAX_MB`
 - Cold starts/latency spikes:
   - keep `--min-instances 1` during early validation
 - Empty search/list results:

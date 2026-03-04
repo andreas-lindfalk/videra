@@ -8,6 +8,7 @@ Privacy-native multimodal video memory MCP server in Go.
 - Default mode is `VIDERA_INGESTION_MODE=simulated` (fixture-like placeholder segments for deterministic testing).
 - A new local `real` ingestion mode is available: `VIDERA_INGESTION_MODE=real` uses sidecar transcript files (`.srt`, `.vtt`, `.txt`) next to the video file.
 - In `real` mode, if no sidecar is found, Videra attempts FFmpeg audio extraction + Whisper CLI transcription (`whisper` or `python3 -m whisper`).
+- In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 - Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
@@ -75,6 +76,12 @@ Optional Whisper settings for transcription fallback:
 
 - `VIDERA_WHISPER_MODEL` (default: `tiny`)
 - `VIDERA_WHISPER_LANGUAGE` (optional language hint)
+
+Remote media fetch controls (used when `index_video` path is `http://` or `https://`):
+
+- `VIDERA_REMOTE_FETCH_ENABLED` (default: `true`)
+- `VIDERA_REMOTE_FETCH_TIMEOUT_SEC` (default: `60`)
+- `VIDERA_REMOTE_FETCH_MAX_MB` (default: `200`)
 
 ```bash
 VIDERA_VIDEO_DIR=/absolute/path/to/your/video/folder make local-up

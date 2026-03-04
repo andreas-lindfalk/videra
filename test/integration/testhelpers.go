@@ -22,6 +22,10 @@ func startVideraContainer(t *testing.T, ctx context.Context) (testcontainers.Con
 }
 
 func startVideraContainerWithEnv(t *testing.T, ctx context.Context, envOverrides map[string]string) (testcontainers.Container, *client.Client) {
+	return startVideraContainerWithEnvAndHostPorts(t, ctx, envOverrides, nil)
+}
+
+func startVideraContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int) (testcontainers.Container, *client.Client) {
 	t.Helper()
 
 	testcontainers.SkipIfProviderIsNotHealthy(t)
@@ -36,9 +40,7 @@ func startVideraContainerWithEnv(t *testing.T, ctx context.Context, envOverrides
 		env[key] = value
 	}
 
-	ctr, err := testcontainers.Run(
-		ctx,
-		"",
+	customizers := []testcontainers.ContainerCustomizer{
 		testcontainers.WithDockerfile(testcontainers.FromDockerfile{
 			Context:    "../..",
 			Dockerfile: "Dockerfile",
@@ -49,7 +51,12 @@ func startVideraContainerWithEnv(t *testing.T, ctx context.Context, envOverrides
 		testcontainers.WithExposedPorts(string(containerMCPPort)),
 		testcontainers.WithEnv(env),
 		testcontainers.WithWaitStrategy(wait.ForHTTP("/mcp").WithPort(containerMCPPort)),
-	)
+	}
+	if len(hostPorts) > 0 {
+		customizers = append(customizers, testcontainers.WithHostPortAccess(hostPorts...))
+	}
+
+	ctr, err := testcontainers.Run(ctx, "", customizers...)
 	testcontainers.CleanupContainer(t, ctr)
 	require.NoError(t, err)
 

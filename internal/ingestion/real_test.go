@@ -58,6 +58,26 @@ func (e *cueVisualEmbedder) EmbedFrame(_ context.Context, framePath string) ([]f
 	return nil, "team discussing timeline", nil
 }
 
+type fakeRemoteFetcher struct {
+	called  bool
+	url     string
+	path    string
+	err     error
+	cleanup func()
+}
+
+func (f *fakeRemoteFetcher) Fetch(_ context.Context, sourceURL string) (string, func(), error) {
+	f.called = true
+	f.url = sourceURL
+	if f.err != nil {
+		return "", nil, f.err
+	}
+	if f.cleanup == nil {
+		f.cleanup = func() {}
+	}
+	return f.path, f.cleanup, nil
+}
+
 func TestParseTimedCaptionSegmentsSRT(t *testing.T) {
 	raw := "1\n00:00:01,000 --> 00:00:03,200\nHello world\n\n2\n00:00:03,500 --> 00:00:05,000\nBudget roadmap\n"
 
@@ -152,6 +172,45 @@ func TestRealIngesterReturnsErrorWhenNoSidecarAndTranscriptionFails(t *testing.T
 	_, err = ingester.IndexVideo(context.Background(), videoPath)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "transcription failed")
+}
+
+func TestRealIngesterIndexesRemoteURLThroughFetcher(t *testing.T) {
+	tmpDir := t.TempDir()
+	localMediaPath := filepath.Join(tmpDir, "downloaded.mp4")
+	require.NoError(t, createFile(localMediaPath, "placeholder"))
+
+	store, err := storage.NewChromemStore(filepath.Join(tmpDir, "data"), embedding.NewDeterministicTextEmbedder())
+	require.NoError(t, err)
+
+	ffmpeg := &fakeFFmpegRunner{}
+	transcriber := &fakeTranscriber{segments: []storage.Segment{{StartMs: 0, EndMs: 1000, Text: "remote transcript"}}}
+	remoteFetcher := &fakeRemoteFetcher{path: localMediaPath}
+	remoteURL := "https://example.com/clip.mp4"
+
+	ingester := NewRealIngesterWithAllDeps(store, IndexOptions{FrameIntervalSec: 5, Concurrency: 1}, ffmpeg, transcriber, NewStubCLIPEmbedder(), remoteFetcher)
+	video, err := ingester.IndexVideo(context.Background(), remoteURL)
+	require.NoError(t, err)
+	require.True(t, remoteFetcher.called)
+	require.Equal(t, remoteURL, remoteFetcher.url)
+	require.Equal(t, remoteURL, video.FilePath)
+	require.Equal(t, 1, video.AudioSegments)
+
+	transcript, err := store.GetTranscript(context.Background(), video.ID)
+	require.NoError(t, err)
+	require.Equal(t, "remote transcript", transcript[0].Text)
+}
+
+func TestRealIngesterReturnsErrorWhenRemoteFetchFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	store, err := storage.NewChromemStore(filepath.Join(tmpDir, "data"), embedding.NewDeterministicTextEmbedder())
+	require.NoError(t, err)
+
+	remoteFetcher := &fakeRemoteFetcher{err: os.ErrPermission}
+	ingester := NewRealIngesterWithAllDeps(store, IndexOptions{FrameIntervalSec: 5, Concurrency: 1}, &fakeFFmpegRunner{}, &fakeTranscriber{}, NewStubCLIPEmbedder(), remoteFetcher)
+
+	_, err = ingester.IndexVideo(context.Background(), "https://example.com/clip.mp4")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "prepare remote media source")
 }
 
 func TestRealIngesterSpokenPhraseQueryReturnsExpectedWindow(t *testing.T) {

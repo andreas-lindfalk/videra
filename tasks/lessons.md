@@ -124,3 +124,9 @@
 
 - **Split runtime images by capability, not by API behavior.** Keep a slim default image for speed and reproducibility, and a full tool-complete image for fallback paths while preserving identical MCP contracts.
 - **Capability visibility prevents deployment surprises.** Startup logging for ffmpeg/whisper/python/tesseract availability makes missing optional dependencies explicit before indexing requests fail.
+
+## 2026-03-04 — Cloud-Ready Remote Ingestion Parity
+
+- **Preserve idempotency via source identity, not temp-file identity.** For remote ingestion, keep the original URL as `sourcePath` while processing a fetched temporary file so retries remain deterministic.
+- **Bounded fetch controls are a deployment contract.** Keep timeout and max payload size explicit (`VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`) to avoid environment-dependent failures.
+- **Containerized remote-fetch integration is deterministic with host-port exposure.** Exposing host test fixture ports to integration containers enables reliable verification of remote error paths (e.g., oversize payload).

@@ -35,7 +35,7 @@ Related runbook:
 2. Validate parity locally (`make local-e2e`) with fixed fixtures.
 3. Deploy same image to Cloud Run and Hetzner VM target.
 4. Run identical parity checklist on both:
-   - `index_video`
+  - `index_video` (prefer remote HTTP(S) source for direct Cloud Run parity)
    - `search_video` (deterministic ordering)
    - `list_videos`
    - `video://{id}/transcript`

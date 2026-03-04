@@ -10,8 +10,8 @@ Use this checklist after each deployment update.
 - MCP endpoint reachable in both environments (`.../mcp`).
 - Equivalent env settings for core behavior (`VIDERA_TRANSPORT`, log level, retrieval weights).
 - Test fixture strategy chosen:
-  - Hetzner: can use server-visible `/videos/...` path indexing.
-  - Cloud Run: if server-local path indexing is unavailable, run endpoint/runtime checks and mark indexing-dependent checks as `blocked` with reason.
+  - Hetzner: can use server-visible `/videos/...` path indexing or remote HTTP(S) URL indexing.
+  - Cloud Run: use remote HTTP(S) URL indexing for parity checks.
 
 ## Execution Matrix
 
@@ -21,7 +21,7 @@ Run each check in both environments and record result.
 |---|---|---|---|
 | MCP connect to `/mcp` | [ ] pass / [ ] fail | [ ] pass / [ ] fail | Successful MCP handshake |
 | `list_videos` | [ ] pass / [ ] fail | [ ] pass / [ ] fail | Stable response shape |
-| `index_video` (if supported in env) | [ ] pass / [ ] fail | [ ] pass / [ ] fail / [ ] blocked | Returns `videoId`, `status` |
+| `index_video` | [ ] pass / [ ] fail | [ ] pass / [ ] fail | Returns `videoId`, `status` |
 | `search_video` deterministic repeat (same query twice) | [ ] pass / [ ] fail | [ ] pass / [ ] fail | Identical ordering for same inputs |
 | `read_resource` transcript (`video://{id}/transcript`) | [ ] pass / [ ] fail | [ ] pass / [ ] fail | Resource resolves with expected format |
 | Restart behavior | [ ] pass / [ ] fail | [ ] pass / [ ] fail | Service recovers without contract drift |
@@ -47,14 +47,13 @@ Pass criteria:
 
 ### 3) `index_video` behavior
 
-- Attempt indexing using environment-appropriate source path.
+- Attempt indexing using environment-appropriate source:
+  - Hetzner: `/videos/...` path or remote HTTP(S) URL
+  - Cloud Run: remote HTTP(S) URL
 - Capture resulting `videoId`.
 
 Pass criteria:
 - MCP tool returns success and expected fields.
-
-Block condition (allowed today for Cloud Run):
-- No server-visible local-file path strategy in environment.
 
 ### 4) `search_video` determinism
 
@@ -93,7 +92,7 @@ Date: <YYYY-MM-DD>
 Checks:
 - MCP connect: pass/fail
 - list_videos: pass/fail
-- index_video: pass/fail/blocked (+ reason)
+- index_video: pass/fail
 - search deterministic repeat: pass/fail
 - transcript resource: pass/fail
 - restart behavior: pass/fail
@@ -101,11 +100,10 @@ Checks:
 
 Notes:
 - Observed deltas:
-- If any blocked checks, mitigation plan:
+- If any failed checks, mitigation plan:
 ```
 
 ## Exit Criteria
 
 - No unexplained response-contract differences between environments.
-- Any blocked check has explicit reason and mitigation tracked in phase plan.
 - Determinism check passes where indexing/search is supported.

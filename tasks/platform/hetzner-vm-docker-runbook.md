@@ -74,6 +74,10 @@ VIDERA_HTTP_ADDR=:8080
 VIDERA_DATA_DIR=/data
 VIDERA_LOG_LEVEL=info
 VIDERA_RUNTIME_MODE=prod
+VIDERA_INGESTION_MODE=real
+VIDERA_REMOTE_FETCH_ENABLED=true
+VIDERA_REMOTE_FETCH_TIMEOUT_SEC=60
+VIDERA_REMOTE_FETCH_MAX_MB=200
 DOMAIN=<your-domain>
 VIDERA_IMAGE=ghcr.io/andreas-lindfalk/videra:latest-full
 EOF
@@ -154,7 +158,9 @@ From your local machine (or any MCP client), point to:
 Then run MCP checks:
 
 1. `list_videos`
-2. `index_video` with server-visible path (example: `/videos/IMG_3711.MOV`)
+2. `index_video` with either:
+  - server-visible path (example: `/videos/IMG_3711.MOV`), or
+  - remote HTTP(S) URL (for cloud/object-storage parity checks)
 3. `search_video` with a test query
 4. `read_resource` for `video://<videoId>/transcript`
 
@@ -197,6 +203,10 @@ tar -czf /root/videra-data-backup-$(date +%F).tgz -C /opt/videra data
   - check `docker compose logs -f videra caddy`
 - `index_video` path not found:
   - file must exist inside container path (`/videos/...`)
+- remote fetch errors:
+  - verify URL is reachable from VM/container network
+  - verify source is HTTP(S) and returns `200`
+  - verify payload fits `VIDERA_REMOTE_FETCH_MAX_MB`
 
 ## 10) Parity note
 

@@ -40,6 +40,9 @@ All config via environment variables with `VIDERA_` prefix:
 - `VIDERA_HTTP_ADDR` — HTTP listen address (default `:8080`)
 - `VIDERA_DATA_DIR` — Persistent storage path (default `./data`)
 - `VIDERA_LOG_LEVEL` — `debug`, `info` (default), `warn`, `error`
+- `VIDERA_REMOTE_FETCH_ENABLED` — allow/deny remote HTTP(S) media ingestion in real mode (default `true`)
+- `VIDERA_REMOTE_FETCH_TIMEOUT_SEC` — remote fetch timeout in seconds (default `60`)
+- `VIDERA_REMOTE_FETCH_MAX_MB` — max remote media payload size in MB (default `200`)
 
 ## Testing
 
@@ -61,6 +64,12 @@ Never ignore or dismiss failing tests as "pre-existing" or "unrelated" failures.
 2. Check error messages carefully - they often reveal issues with generated code, mappings, or other side effects
 3. Only after thorough investigation can a test failure be considered unrelated
 4. If truly unrelated, note the failure and suggest investigating separately
+
+When testing remote-source ingestion behavior in integration tests:
+
+- Use deterministic in-test HTTP fixtures (for example `httptest` server) instead of external URLs.
+- Expose host fixture ports to containers and access via `host.testcontainers.internal` when needed.
+- Assert explicit error semantics for bounded failures (timeout, invalid source, max-size exceeded).
 
 ### Test Quality Bar (Mandatory)
 
@@ -104,6 +113,15 @@ Reference:
 - Favor idempotent indexing operations and explicit job boundaries to fit async Cloud Run Job execution.
 - Favor idempotent indexing operations and explicit job boundaries to fit async execution models on both Cloud Run and Hetzner-based schedulers.
 - Keep MCP transport compatibility for federation patterns (stdio/SSE/streamable HTTP) expected by AgentGateway MCP integrations.
+- Keep ingestion source contract parity: local paths remain supported, and cloud parity indexing should use remote HTTP(S) sources with bounded fetch controls.
+
+## Change Hygiene (Agent Workflow)
+
+- If `VIDERA_` runtime/env contract changes, update these docs in the same change set:
+  - `README.md`
+  - `tasks/platform/env-contract.md`
+  - relevant deployment runbooks under `tasks/platform/`
+- If ingestion behavior changes, update both focused unit tests and at least one integration scenario proving the contract.
 
 ## Hetzner Equivalency Note
 

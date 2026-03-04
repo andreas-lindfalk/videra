@@ -22,6 +22,7 @@ type RealIngester struct {
 	store          storage.VectorStore
 	ffmpeg         FFmpegRunner
 	transcriber    Transcriber
+	remoteFetcher  RemoteFetcher
 	visualEmbedder VisualEmbedder
 	options        IndexOptions
 }
@@ -31,17 +32,34 @@ func NewRealIngester(store storage.VectorStore, options IndexOptions) *RealInges
 }
 
 func NewRealIngesterWithDeps(store storage.VectorStore, options IndexOptions, ffmpeg FFmpegRunner, transcriber Transcriber, visualEmbedder VisualEmbedder) *RealIngester {
+	return NewRealIngesterWithAllDeps(store, options, ffmpeg, transcriber, visualEmbedder, nil)
+}
+
+func NewRealIngesterWithAllDeps(store storage.VectorStore, options IndexOptions, ffmpeg FFmpegRunner, transcriber Transcriber, visualEmbedder VisualEmbedder, remoteFetcher RemoteFetcher) *RealIngester {
 	if options.FrameIntervalSec <= 0 {
 		options.FrameIntervalSec = 5
 	}
 	if options.Concurrency <= 0 {
 		options.Concurrency = 4
 	}
+	if options.RemoteFetchTimeoutSec <= 0 {
+		options.RemoteFetchTimeoutSec = 60
+	}
+	if options.RemoteFetchMaxMB <= 0 {
+		options.RemoteFetchMaxMB = 200
+	}
 	if ffmpeg == nil {
 		ffmpeg = ExecFFmpeg{}
 	}
 	if transcriber == nil {
 		transcriber = NewWhisperCLITranscriber()
+	}
+	if remoteFetcher == nil {
+		remoteFetcher = NewHTTPRemoteFetcher(RemoteFetchOptions{
+			Disabled: options.RemoteFetchDisabled,
+			Timeout:  time.Duration(options.RemoteFetchTimeoutSec) * time.Second,
+			MaxBytes: int64(options.RemoteFetchMaxMB) * 1024 * 1024,
+		})
 	}
 	if visualEmbedder == nil {
 		visualEmbedder = NewOCRVisualEmbedder(NewStubCLIPEmbedder())
@@ -51,28 +69,30 @@ func NewRealIngesterWithDeps(store storage.VectorStore, options IndexOptions, ff
 		store:          store,
 		ffmpeg:         ffmpeg,
 		transcriber:    transcriber,
+		remoteFetcher:  remoteFetcher,
 		visualEmbedder: visualEmbedder,
 		options:        options,
 	}
 }
 
 func (i *RealIngester) IndexVideo(ctx context.Context, path string) (storage.Video, error) {
-	if strings.TrimSpace(path) == "" {
+	sourcePath := strings.TrimSpace(path)
+	if sourcePath == "" {
 		return storage.Video{}, fmt.Errorf("path is required")
 	}
-	if isURL(path) {
-		return storage.Video{}, fmt.Errorf("real ingestion mode currently supports only local file paths")
-	}
-	if _, err := os.Stat(path); err != nil {
-		return storage.Video{}, fmt.Errorf("video path not found: %w", err)
-	}
 
-	if existing, ok := i.store.GetVideoBySourcePath(ctx, path); ok {
+	if existing, ok := i.store.GetVideoBySourcePath(ctx, sourcePath); ok {
 		return existing, nil
 	}
 
+	preparedVideoPath, cleanup, err := i.prepareVideoPath(ctx, sourcePath)
+	if err != nil {
+		return storage.Video{}, err
+	}
+	defer cleanup()
+
 	videoID := uuid.NewString()
-	audioSegments, err := i.loadAudioSegments(ctx, path)
+	audioSegments, err := i.loadAudioSegments(ctx, preparedVideoPath)
 	if err != nil {
 		return storage.Video{}, err
 	}
@@ -81,7 +101,7 @@ func (i *RealIngester) IndexVideo(ctx context.Context, path string) (storage.Vid
 		audioSegments[index].Type = storage.SegmentTypeAudio
 	}
 
-	visualSegments := i.buildVisualSegments(ctx, videoID, path)
+	visualSegments := i.buildVisualSegments(ctx, videoID, preparedVideoPath)
 	segments := make([]storage.Segment, 0, len(audioSegments)+len(visualSegments))
 	segments = append(segments, audioSegments...)
 	segments = append(segments, visualSegments...)
@@ -93,7 +113,7 @@ func (i *RealIngester) IndexVideo(ctx context.Context, path string) (storage.Vid
 
 	video := storage.Video{
 		ID:             videoID,
-		FilePath:       path,
+		FilePath:       sourcePath,
 		Status:         storage.VideoStatusIndexed,
 		Indexed:        time.Now().UTC(),
 		Duration:       durationMs,
@@ -110,6 +130,25 @@ func (i *RealIngester) IndexVideo(ctx context.Context, path string) (storage.Vid
 	}
 
 	return video, nil
+}
+
+func (i *RealIngester) prepareVideoPath(ctx context.Context, sourcePath string) (string, func(), error) {
+	if isURL(sourcePath) {
+		if i.remoteFetcher == nil {
+			return "", nil, fmt.Errorf("remote ingestion is not configured")
+		}
+		preparedPath, cleanup, err := i.remoteFetcher.Fetch(ctx, sourcePath)
+		if err != nil {
+			return "", nil, fmt.Errorf("prepare remote media source: %w", err)
+		}
+		return preparedPath, cleanup, nil
+	}
+
+	if _, err := os.Stat(sourcePath); err != nil {
+		return "", nil, fmt.Errorf("video path not found: %w", err)
+	}
+
+	return sourcePath, func() {}, nil
 }
 
 func (i *RealIngester) buildVisualSegments(ctx context.Context, videoID, path string) []storage.Segment {

@@ -13,6 +13,9 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	t.Setenv("VIDERA_LOG_LEVEL", "info")
 	t.Setenv("VIDERA_RUNTIME_MODE", "local")
 	t.Setenv("VIDERA_INGESTION_MODE", "simulated")
+	t.Setenv("VIDERA_REMOTE_FETCH_ENABLED", "true")
+	t.Setenv("VIDERA_REMOTE_FETCH_TIMEOUT_SEC", "60")
+	t.Setenv("VIDERA_REMOTE_FETCH_MAX_MB", "200")
 	t.Setenv("VIDERA_FRAME_INTERVAL_SEC", "5")
 	t.Setenv("VIDERA_DEFAULT_SEARCH_LIMIT", "5")
 	t.Setenv("VIDERA_INDEX_CONCURRENCY", "4")
@@ -28,6 +31,9 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.Equal(t, "./data", cfg.DataDir)
 	require.Equal(t, "local", cfg.RuntimeMode)
 	require.Equal(t, IngestionModeSimulated, cfg.IngestionMode)
+	require.True(t, cfg.RemoteFetchEnabled)
+	require.Equal(t, 60, cfg.RemoteFetchTimeout)
+	require.Equal(t, 200, cfg.RemoteFetchMaxMB)
 }
 
 func TestLoadInvalidTransportStillFails(t *testing.T) {
@@ -44,4 +50,20 @@ func TestLoadInvalidIngestionModeFails(t *testing.T) {
 	_, err := Load()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported VIDERA_INGESTION_MODE")
+}
+
+func TestLoadInvalidRemoteFetchEnabledFails(t *testing.T) {
+	t.Setenv("VIDERA_REMOTE_FETCH_ENABLED", "maybe")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid VIDERA_REMOTE_FETCH_ENABLED")
+}
+
+func TestLoadInvalidRemoteFetchMaxMBFails(t *testing.T) {
+	t.Setenv("VIDERA_REMOTE_FETCH_MAX_MB", "0")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "VIDERA_REMOTE_FETCH_MAX_MB must be > 0")
 }

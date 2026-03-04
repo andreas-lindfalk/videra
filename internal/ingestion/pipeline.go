@@ -21,8 +21,11 @@ type VisualEmbedder interface {
 }
 
 type IndexOptions struct {
-	FrameIntervalSec int
-	Concurrency      int
+	FrameIntervalSec      int
+	Concurrency           int
+	RemoteFetchDisabled   bool
+	RemoteFetchTimeoutSec int
+	RemoteFetchMaxMB      int
 }
 
 type IndexMode string

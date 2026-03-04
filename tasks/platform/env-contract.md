@@ -20,10 +20,14 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 
 - `VIDERA_WHISPER_MODEL` (default `tiny`)
 - `VIDERA_WHISPER_LANGUAGE` (optional; empty means auto)
+- `VIDERA_REMOTE_FETCH_ENABLED` (default `true`)
+- `VIDERA_REMOTE_FETCH_TIMEOUT_SEC` (default `60`)
+- `VIDERA_REMOTE_FETCH_MAX_MB` (default `200`)
 
 Notes:
 - In `real` mode, ingestion first looks for sidecar transcript files (`.srt`/`.vtt`/`.txt`).
 - If no sidecar is found, it attempts FFmpeg audio extraction + Whisper CLI transcription.
+- In `real` mode, remote HTTP(S) media sources are supported when fetch is enabled and within timeout/size limits.
 
 ## Image Profile Contract (Phase 7)
 
@@ -34,7 +38,7 @@ Notes:
 
 ## Provider-Specific Differences (Deployment Layer Only)
 
-- Hetzner: server-visible local file paths can be mounted (`/videos/...`).
-- Cloud Run: local file paths are not a reliable ingestion source; use endpoint/runtime validation until cloud media source path is implemented.
+- Hetzner: server-visible local file paths can be mounted (`/videos/...`) and remote HTTP(S) URLs are also supported.
+- Cloud Run: local file paths are not a reliable ingestion source; use remote HTTP(S) URLs for indexing parity.
 
 These differences must remain in deployment/runbook logic, not MCP contract behavior.
