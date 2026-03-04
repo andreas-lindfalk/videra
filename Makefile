@@ -1,4 +1,4 @@
-.PHONY: build test integration-test docker-build docker-build-slim docker-build-full run-stdio run-http run-stdio-full run-http-full local-up local-down local-smoke local-smoke-default local-e2e
+.PHONY: build test integration-test docker-build docker-build-slim docker-build-full run-stdio run-http run-stdio-full run-http-full local-up local-down local-smoke local-smoke-default local-e2e release-gate release-gate-split
 
 build:
 	go build -o bin/videra ./cmd/videra
@@ -63,3 +63,12 @@ local-smoke-default:
 local-e2e: local-up local-smoke-default
 	@echo "Local MCP server is running at http://localhost:8080/mcp"
 	@echo "Stop it with: make local-down"
+
+release-gate:
+	$(MAKE) build
+	$(MAKE) test
+	$(MAKE) integration-test
+	$(MAKE) docker-build
+
+release-gate-split:
+	go test ./test/integration/... -v -tags=integration -run 'TestIndexVideoAsyncSplitRoleRedisLifecycle|TestIndexVideoAsyncSplitRoleRedisSharedStorageVisibility|TestWorkerRoleWithHTTPTransportFailsFastAtStartup' -count=1

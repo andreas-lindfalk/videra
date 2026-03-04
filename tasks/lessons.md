@@ -185,3 +185,9 @@
 - **Control-plane success does not imply data-plane visibility.** `get_index_job=completed` can still coexist with empty `list_videos`/`search_video` unless API and worker share index storage explicitly.
 - **Make shared-storage behavior explicit in runtime config.** A dedicated split-role data-plane flag (`VIDERA_SPLIT_SHARED_STORAGE`) reduces ambiguity and makes operator intent auditable.
 - **Prove both sides in integration tests.** Keep one test for degraded non-shared semantics and one for shared-mount visibility success so regressions in either path are caught quickly.
+
+## 2026-03-04 — MVP Exit Gate Discipline
+
+- **A single release command reduces ambiguity.** A canonical gate (`make release-gate`) avoids fragmented validation across ad-hoc command chains.
+- **Keep split-role checks explicit even when included in full integration runs.** A focused gate (`make release-gate-split`) makes control-plane/data-plane semantics visible to operators and release reviewers.
+- **Treat parity evidence as a required artifact, not tribal knowledge.** A fixed release evidence template improves repeatability and go/no-go decisions.

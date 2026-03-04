@@ -4,6 +4,10 @@ Goal: verify that Videra MCP behavior is consistent across Hetzner and Cloud Run
 
 Use this checklist after each deployment update.
 
+Release-candidate workflow reference:
+
+- `tasks/platform/mvp-release-gate.md`
+
 ## Preconditions
 
 - Same application image/version deployed to both environments.
@@ -107,3 +111,18 @@ Notes:
 
 - No unexplained response-contract differences between environments.
 - Determinism check passes where indexing/search is supported.
+
+## Split-Role Release-Critical Add-on
+
+Before final MVP go/no-go, also run:
+
+```bash
+make release-gate
+make release-gate-split
+```
+
+Pass criteria:
+
+- Split-role lifecycle semantics pass (`pending -> completed|failed`) with explicit retry-exhausted failure behavior.
+- Shared-storage split-role visibility path is proven (`list_videos` / `search_video` after async completion).
+- Worker-role transport guardrail is proven (`VIDERA_JOBQUEUE_ROLE=worker` rejects HTTP transport).

@@ -121,12 +121,35 @@ Practical flow:
 - Build: `make build`
 - Fast tests: `make test`
 - Integration tests: `make integration-test`
+- MVP release gate (full): `make release-gate`
+- MVP split-role critical checks: `make release-gate-split`
 - Docker build (slim default): `make docker-build` or `make docker-build-slim`
 - Docker build (full tool-complete): `make docker-build-full`
 - Stdio run: `make run-stdio`
 - HTTP run: `make run-http`
 - Stdio run (full): `make run-stdio-full`
 - HTTP run (full): `make run-http-full`
+
+## MVP Release Gate (Phase 16)
+
+Use this when producing an MVP release-candidate signal.
+
+1. Run the full gate:
+
+```bash
+make release-gate
+```
+
+2. Run explicit split-role critical checks:
+
+```bash
+make release-gate-split
+```
+
+3. Record evidence using:
+
+- `tasks/platform/mvp-release-gate.md`
+- `tasks/platform/parity-validation-checklist.md`
 
 ## Copilot / MCP Client Setup Notes
 

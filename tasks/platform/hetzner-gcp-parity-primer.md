@@ -7,6 +7,7 @@ Related runbook:
 - `tasks/platform/hetzner-vm-docker-runbook.md`
 - `tasks/platform/cloud-run-runbook.md`
 - `tasks/platform/parity-validation-checklist.md`
+- `tasks/platform/mvp-release-gate.md`
 - `tasks/platform/env-contract.md`
 - `tasks/quality/local-retrieval-quality-checklist.md`
 
