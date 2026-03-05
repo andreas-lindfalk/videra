@@ -16,6 +16,17 @@ Related docs:
 - `tasks/platform/rc2-release-execution-checklist-2026-03-05.md`
 - `tasks/platform/rc2-release-evidence-2026-03-05.md`
 - `tasks/platform/pilot-quality-gate-evidence-2026-03-05.md`
+- `tasks/platform/deployment-promotion-runbook-2026-03-05.md`
+
+## Consolidated Promotion Command (Phase 30)
+
+Preferred operator path:
+
+```bash
+make deployment-promotion-gate
+```
+
+This wraps `release-gate`, `release-gate-split`, and `real-corpus-promotion-gate` in one run.
 
 ## Required Command Gate
 

@@ -252,3 +252,8 @@
 
 - **Run backend migration decisions through explicit GO criteria.** A weighted matrix plus hard preconditions prevents architecture churn driven by intuition.
 - **Require benchmark and runtime-contract proof before migration.** If performance gains and operational readiness are not both demonstrated, defer migration and preserve the stable path.
+
+## 2026-03-05 — Promotion Workflow Consolidation
+
+- **One-command operator flows reduce decision drift.** Wrapping release, split-role, and promotion gates into a single command improves repeatability and handoff quality.
+- **Evidence templates should match command composition.** Consolidated commands need consolidated evidence artifacts to keep GO/NO-GO review fast and auditable.

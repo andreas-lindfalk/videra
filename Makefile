@@ -1,4 +1,4 @@
-.PHONY: build test integration-test integration-test-fresh docker-build docker-build-slim docker-build-full run-stdio run-http run-stdio-full run-http-full local-up local-down local-smoke local-smoke-default local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate
+.PHONY: build test integration-test integration-test-fresh docker-build docker-build-slim docker-build-full run-stdio run-http run-stdio-full run-http-full local-up local-down local-smoke local-smoke-default local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate
 
 build:
 	go build -o bin/videra ./cmd/videra
@@ -96,3 +96,8 @@ pilot-quality-gate:
 real-corpus-promotion-gate:
 	$(MAKE) pilot-quality-gate
 	go test ./test/integration/... -v -tags=integration -run 'TestDefaultIntegrationSuite/(TestProofPackScenariosEvidenceAndDeterminism|TestProofPackProductRecallPrioritizesTop2Evidence|TestSearchVideoDeterministicOrdering|TestToolResponseBackwardCompatFields)' -count=1
+
+deployment-promotion-gate:
+	$(MAKE) release-gate
+	$(MAKE) release-gate-split
+	$(MAKE) real-corpus-promotion-gate

@@ -78,3 +78,17 @@ Required evidence additions:
   - [ ] `deterministicRate`
   - [ ] `topTwoQualityRate`
 - [ ] Treat release decision as NO-GO if pilot quality gate fails.
+
+## 7) Phase 30 Consolidated Operator Path
+
+Preferred single-command promotion path for future runs:
+
+```bash
+make deployment-promotion-gate
+```
+
+This command composes:
+
+- `make release-gate`
+- `make release-gate-split`
+- `make real-corpus-promotion-gate`

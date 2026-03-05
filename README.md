@@ -137,6 +137,7 @@ Practical flow:
 - Integration tests (fresh run): `make integration-test-fresh`
 - Pilot quality gate (benchmark + real-mode guardrails): `make pilot-quality-gate`
 - Real-corpus promotion gate: `make real-corpus-promotion-gate`
+- Deployment promotion gate (consolidated): `make deployment-promotion-gate`
 - MVP release gate (full): `make release-gate`
 - MVP split-role critical checks: `make release-gate-split`
 - MVP release gate preflight: `make release-gate-preflight`
@@ -309,3 +310,16 @@ Related artifacts:
 
 - `tasks/platform/real-corpus-promotion-gate-2026-03-05.md`
 - `tasks/platform/real-corpus-promotion-evidence-template.md`
+
+## Deployment Promotion Runbook (Phase 30)
+
+Single command for consolidated promotion decision flow:
+
+```bash
+make deployment-promotion-gate
+```
+
+Related artifacts:
+
+- `tasks/platform/deployment-promotion-runbook-2026-03-05.md`
+- `tasks/platform/deployment-promotion-evidence-template.md`

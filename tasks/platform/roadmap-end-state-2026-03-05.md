@@ -61,21 +61,22 @@ Why it matters:
 - Release evidence + quality signal coupling: in place (Phase 27).
 - Real-corpus promotion criteria + evidence format: in place (Phase 28).
 - Storage decision re-checkpoint: completed with NO-GO for immediate migration (Phase 29).
-- Remaining gap: promotion workflow consolidation before any future backend migration decision refresh.
+- Deployment promotion workflow consolidation: completed (Phase 30).
+- Remaining gap: storage benchmark inputs for any future migration decision refresh.
 
 ## Next Planned Phases
 
-### Phase 30 — Deployment Promotion Runbook Consolidation
+### Phase 31 — Storage Benchmark Harness (Decision Refresh Input)
 
 Goal:
 
-- Consolidate release + quality + real-corpus promotion commands into one operator-facing promotion runbook.
+- Produce repeatable backend comparison benchmarks required for a future storage checkpoint re-open.
 
 Expected outcome:
 
-- One concise promotion workflow for recurring release/deployment decisions.
+- Measured artifact set that can satisfy migration GO criteria when/if benefits are proven.
 
-### Phase 31 — Conditional Storage Migration Track (Only if a future checkpoint = GO)
+### Phase 32 — Conditional Storage Migration Track (Only if a future checkpoint = GO)
 
 Goal:
 
@@ -85,15 +86,15 @@ Expected outcome:
 
 - Measured migration outcome with parity/quality validation and documented rollback readiness.
 
-### Phase 32 — Storage Benchmark Harness (Decision Refresh Input)
+### Phase 33 — Cross-Environment Promotion Evidence Unification
 
 Goal:
 
-- Produce repeatable backend comparison benchmarks required for a future storage checkpoint re-open.
+- Align local promotion evidence and Hetzner/Cloud Run parity evidence into one decision summary format.
 
 Expected outcome:
 
-- Measured artifact set that can satisfy migration GO criteria when/if benefits are proven.
+- Faster and clearer GO/NO-GO review across environments.
 
 ## Guardrails for Upcoming Work
 

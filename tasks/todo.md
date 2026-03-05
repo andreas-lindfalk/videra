@@ -2,7 +2,7 @@
 
 ## Active Task
 
-No active task. Last archived: Phase 29 (`tasks/archive/2026-03-05-phase-29-storage-decision-recheckpoint.md`).
+No active task. Last archived: Phase 30 (`tasks/archive/2026-03-05-phase-30-deployment-promotion-runbook-consolidation.md`).
 
 ## Definition of Done Template
 
