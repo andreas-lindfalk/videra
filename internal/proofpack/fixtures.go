@@ -17,10 +17,21 @@ type Scenario struct {
 //go:embed fixtures/scenarios.json
 var scenariosFixture []byte
 
+//go:embed fixtures/domain_profiles.json
+var domainProfilesFixture []byte
+
 func LoadScenarios() ([]Scenario, error) {
 	var scenarios []Scenario
 	if err := json.Unmarshal(scenariosFixture, &scenarios); err != nil {
 		return nil, fmt.Errorf("decode scenarios fixture: %w", err)
+	}
+	return scenarios, nil
+}
+
+func LoadDomainProfileScenarios() ([]Scenario, error) {
+	var scenarios []Scenario
+	if err := json.Unmarshal(domainProfilesFixture, &scenarios); err != nil {
+		return nil, fmt.Errorf("decode domain profile scenarios fixture: %w", err)
 	}
 	return scenarios, nil
 }

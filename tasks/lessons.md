@@ -212,3 +212,8 @@
 
 - **Core normalization should be neutral by default.** Hardcoded topic synonym maps in the default path can bias retrieval for unrelated corpora.
 - **Domain mapping belongs in explicit runtime config.** Optional canonical maps keep behavior adaptable without forcing assumptions across all datasets.
+
+## 2026-03-05 — Domain Mapping Evaluation Discipline
+
+- **Validate optional mappings with paired OFF/ON tests on the same fixture.** Comparing rank and similarity deltas for target evidence provides clear proof of domain profile value.
+- **Keep neutral-default checks in the same phase.** Domain tuning should never replace baseline determinism and backward-compatibility guarantees.

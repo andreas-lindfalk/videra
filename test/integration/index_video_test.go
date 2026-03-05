@@ -657,8 +657,22 @@ type weightingIntegrationSuite struct {
 	visualFavCli *client.Client
 }
 
+type canonicalMappingIntegrationSuite struct {
+	suite.Suite
+
+	ctx        context.Context
+	neutralCtr testcontainers.Container
+	neutralCli *client.Client
+	mappedCtr  testcontainers.Container
+	mappedCli  *client.Client
+}
+
 func TestWeightingIntegrationSuite(t *testing.T) {
 	suite.Run(t, &weightingIntegrationSuite{})
+}
+
+func TestCanonicalMappingIntegrationSuite(t *testing.T) {
+	suite.Run(t, &canonicalMappingIntegrationSuite{})
 }
 
 func (s *weightingIntegrationSuite) SetupSuite() {
@@ -675,9 +689,23 @@ func (s *weightingIntegrationSuite) SetupSuite() {
 	})
 }
 
+func (s *canonicalMappingIntegrationSuite) SetupSuite() {
+	s.ctx = context.Background()
+
+	s.neutralCtr, s.neutralCli = startVideraContainerWithEnv(s.T(), s.ctx, nil)
+	s.mappedCtr, s.mappedCli = startVideraContainerWithEnv(s.T(), s.ctx, map[string]string{
+		"VIDERA_SEMANTIC_CANONICAL_MAP": "kitty=cat,feline=cat,cats=cat",
+	})
+}
+
 func (s *weightingIntegrationSuite) SetupTest() {
 	resetIndex(s.T(), s.ctx, s.audioFavCli)
 	resetIndex(s.T(), s.ctx, s.visualFavCli)
+}
+
+func (s *canonicalMappingIntegrationSuite) SetupTest() {
+	resetIndex(s.T(), s.ctx, s.neutralCli)
+	resetIndex(s.T(), s.ctx, s.mappedCli)
 }
 
 func (s *weightingIntegrationSuite) TestSearchVideoModalityWeightingBehavior() {
@@ -718,6 +746,96 @@ func (s *weightingIntegrationSuite) TestSearchVideoModalityWeightingBehavior() {
 
 	require.Greater(t, visualFavVisualScore, audioFavVisualScore)
 	require.Greater(t, audioFavAudioScore, visualFavAudioScore)
+}
+
+func (s *canonicalMappingIntegrationSuite) TestDomainProfileNeutralLiteralRecall() {
+	t := s.T()
+	ctx := s.ctx
+
+	scenarios, err := proofpack.LoadDomainProfileScenarios()
+	require.NoError(t, err)
+
+	literalScenario, found := findScenarioByName(scenarios, "animals_literal_recall")
+	require.True(t, found)
+
+	_, err = s.neutralCli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": literalScenario.VideoPath,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	first := searchAndExtractResults(t, ctx, s.neutralCli, literalScenario.Query, 5)
+	second := searchAndExtractResults(t, ctx, s.neutralCli, literalScenario.Query, 5)
+
+	require.Equal(t, first, second)
+	require.GreaterOrEqual(t, len(first), literalScenario.MinResults)
+	require.GreaterOrEqual(t, evidenceMatches(first, literalScenario.ExpectedEvidence), len(literalScenario.ExpectedEvidence))
+}
+
+func (s *canonicalMappingIntegrationSuite) TestDomainProfileMappingImprovesSynonymRecall() {
+	t := s.T()
+	ctx := s.ctx
+
+	scenarios, err := proofpack.LoadDomainProfileScenarios()
+	require.NoError(t, err)
+
+	synonymScenario, found := findScenarioByName(scenarios, "animals_synonym_profile")
+	require.True(t, found)
+
+	for _, cli := range []*client.Client{s.neutralCli, s.mappedCli} {
+		indexResult, indexErr := cli.CallTool(ctx, mcp.CallToolRequest{
+			Params: mcp.CallToolParams{
+				Name: "index_video",
+				Arguments: map[string]any{
+					"path": synonymScenario.VideoPath,
+				},
+			},
+		})
+		require.NoError(t, indexErr)
+		require.False(t, indexResult.IsError)
+	}
+
+	neutralResults := searchAndExtractResults(t, ctx, s.neutralCli, synonymScenario.Query, 10)
+	mappedResults := searchAndExtractResults(t, ctx, s.mappedCli, synonymScenario.Query, 10)
+
+	require.GreaterOrEqual(t, evidenceMatches(mappedResults, synonymScenario.ExpectedEvidence), len(synonymScenario.ExpectedEvidence))
+
+	needle := "proofpack-cats-cat"
+	neutralRank, neutralScore := findSnippetRankAndSimilarity(neutralResults, needle)
+	mappedRank, mappedScore := findSnippetRankAndSimilarity(mappedResults, needle)
+
+	require.NotEqual(t, -1, neutralRank)
+	require.NotEqual(t, -1, mappedRank)
+	require.LessOrEqual(t, mappedRank, neutralRank)
+	require.Greater(t, mappedScore, neutralScore)
+}
+
+func findScenarioByName(scenarios []proofpack.Scenario, name string) (proofpack.Scenario, bool) {
+	for _, scenario := range scenarios {
+		if scenario.Name == name {
+			return scenario, true
+		}
+	}
+	return proofpack.Scenario{}, false
+}
+
+func findSnippetRankAndSimilarity(results []map[string]any, needle string) (int, float64) {
+	normalizedNeedle := strings.ToLower(strings.TrimSpace(needle))
+	for idx, result := range results {
+		snippet := strings.ToLower(fmt.Sprintf("%v", result["snippet"]))
+		if !strings.Contains(snippet, normalizedNeedle) {
+			continue
+		}
+
+		similarity, _ := result["similarity"].(float64)
+		return idx, similarity
+	}
+
+	return -1, 0
 }
 
 func searchAndExtractResults(t *testing.T, ctx context.Context, cli *client.Client, query string, limit int) []map[string]any {

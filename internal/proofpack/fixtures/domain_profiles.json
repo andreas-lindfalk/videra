@@ -1,0 +1,16 @@
+[
+  {
+    "name": "animals_literal_recall",
+    "videoPath": "https://example.com/proofpack-cats-cat.mp4",
+    "query": "intro segment proofpack cats",
+    "expectedEvidence": ["intro segment", "proofpack-cats"],
+    "minResults": 2
+  },
+  {
+    "name": "animals_synonym_profile",
+    "videoPath": "https://example.com/proofpack-cats-cat.mp4",
+    "query": "kitty feline",
+    "expectedEvidence": ["proofpack-cats-cat"],
+    "minResults": 1
+  }
+]
