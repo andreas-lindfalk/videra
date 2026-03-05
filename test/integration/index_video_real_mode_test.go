@@ -75,6 +75,30 @@ func TestIndexVideoRealModeRemotePathRespectsMaxSizeBound(t *testing.T) {
 	require.Contains(t, text.Text, "remote media exceeds maximum size")
 }
 
+func TestIndexVideoRealModeRemotePathHonorsDisabledFetch(t *testing.T) {
+	ctx := context.Background()
+	_, cli := startVideraContainerWithEnv(t, ctx, map[string]string{
+		"VIDERA_INGESTION_MODE":       "real",
+		"VIDERA_REMOTE_FETCH_ENABLED": "false",
+	})
+	resetIndex(t, ctx, cli)
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/disabled-fetch.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+
+	text, ok := mcp.AsTextContent(result.Content[0])
+	require.True(t, ok)
+	require.Contains(t, text.Text, "remote ingestion is disabled by configuration")
+}
+
 func TestIndexVideoRealModeRequiresSidecarForLocalPath(t *testing.T) {
 	ctx := context.Background()
 	_, cli := startVideraContainerWithEnv(t, ctx, map[string]string{"VIDERA_INGESTION_MODE": "real"})

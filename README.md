@@ -255,3 +255,16 @@ Redis-first rollout guidance:
 	- run `docker compose logs -f videra` and inspect startup/runtime errors.
 - Integration tests flaky due to state:
 	- use built-in test reset tooling and rerun with `-count=1` when debugging.
+
+## Real Corpus Quality Gate (Phase 23)
+
+Focused real-mode validation command:
+
+```bash
+go test ./test/integration/... -v -tags=integration -run 'TestIndexVideoRealMode(RemotePathRespectsMaxSizeBound|RemotePathHonorsDisabledFetch|RequiresSidecarForLocalPath)' -count=1
+```
+
+Related phase artifacts:
+
+- `tasks/platform/real-corpus-onboarding-checklist-2026-03-05.md`
+- `tasks/platform/real-corpus-quality-gate-2026-03-05.md`

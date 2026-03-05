@@ -217,3 +217,8 @@
 
 - **Validate optional mappings with paired OFF/ON tests on the same fixture.** Comparing rank and similarity deltas for target evidence provides clear proof of domain profile value.
 - **Keep neutral-default checks in the same phase.** Domain tuning should never replace baseline determinism and backward-compatibility guarantees.
+
+## 2026-03-05 — Real Corpus Onboarding Gate Discipline
+
+- **Treat real-mode source constraints as first-class quality gates.** Disabled remote fetch, sidecar requirements, and max-size bounds should have explicit integration assertions and stable error semantics.
+- **Pair real-mode guardrails with deterministic/evidence checks.** Corpus onboarding is only release-ready when ingestion constraints and retrieval quality signals are both green.
