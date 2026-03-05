@@ -56,3 +56,27 @@ func TestRerankHybridResultsPrefersExactPhraseTopHit(t *testing.T) {
 	require.EqualValues(t, 5000, hits[0].StartMs)
 	require.EqualValues(t, 7000, hits[0].EndMs)
 }
+
+func TestRerankHybridResultsTokenOverlapBoostsRelevantSnippet(t *testing.T) {
+	input := []storage.SearchResult{
+		{Segment: storage.Segment{VideoID: "v1", StartMs: 0, EndMs: 1000, Type: storage.SegmentTypeVisual, Text: "sunset beach vacation"}, Score: 0.95},
+		{Segment: storage.Segment{VideoID: "v1", StartMs: 2000, EndMs: 3000, Type: storage.SegmentTypeAudio, Text: "main discussion about roadmap and budget"}, Score: 0.40},
+	}
+
+	hits := rerankHybridResults(input, "budget planning", 2, RankingOptions{AudioWeight: 1.0, VisualWeight: 1.0}, false)
+	require.Len(t, hits, 2)
+	require.Equal(t, storage.SegmentTypeAudio, hits[0].Type)
+	require.Contains(t, hits[0].Snippet, "roadmap and budget")
+}
+
+func TestRerankHybridResultsSynonymBoostsNextActions(t *testing.T) {
+	input := []storage.SearchResult{
+		{Segment: storage.Segment{VideoID: "v1", StartMs: 0, EndMs: 1000, Type: storage.SegmentTypeAudio, Text: "status update unrelated"}, Score: 0.80},
+		{Segment: storage.Segment{VideoID: "v1", StartMs: 1000, EndMs: 2000, Type: storage.SegmentTypeAudio, Text: "closing remarks and next actions after budget discussion"}, Score: 0.35},
+	}
+
+	hits := rerankHybridResults(input, "price concerns next steps", 2, RankingOptions{AudioWeight: 1.0, VisualWeight: 1.0}, false)
+	require.NotEmpty(t, hits)
+	require.Contains(t, hits[0].Snippet, "next actions")
+	require.Equal(t, storage.SegmentTypeAudio, hits[0].Type)
+}

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/andreas-lindfalk/videra/internal/ingestion"
 	"github.com/andreas-lindfalk/videra/internal/storage"
@@ -331,6 +333,7 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 	})
 
 	selected := make([]storage.SearchHit, 0, limit)
+	deferred := make([]storage.SearchResult, 0, len(sorted))
 	seen := map[string]struct{}{}
 	hasAudio := false
 	hasVisual := false
@@ -341,16 +344,20 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 			continue
 		}
 
+		lexical := lexicalMatchBoost(result.Segment.Text, normalizedQuery)
+
 		if len(selected) < 2 {
-			if result.Segment.Type == storage.SegmentTypeAudio && hasAudio {
+			if lexical == 0 && result.Segment.Type == storage.SegmentTypeAudio && hasAudio {
+				deferred = append(deferred, result)
 				continue
 			}
-			if result.Segment.Type == storage.SegmentTypeVisual && hasVisual {
+			if lexical == 0 && result.Segment.Type == storage.SegmentTypeVisual && hasVisual {
+				deferred = append(deferred, result)
 				continue
 			}
 		}
 
-		weighted := float32(weightedScore(result, ranking) + lexicalMatchBoost(result.Segment.Text, normalizedQuery))
+		weighted := float32(weightedScore(result, ranking) + lexical)
 		hit := storage.SearchHit{
 			VideoID:       result.Segment.VideoID,
 			StartMs:       result.Segment.StartMs,
@@ -379,6 +386,39 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 		}
 	}
 
+	if len(selected) < limit && len(deferred) > 0 {
+		for _, result := range deferred {
+			key := fmt.Sprintf("%s:%d:%d:%s", result.Segment.VideoID, result.Segment.StartMs, result.Segment.EndMs, result.Segment.Type)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+
+			weighted := float32(weightedScore(result, ranking) + lexicalMatchBoost(result.Segment.Text, normalizedQuery))
+			hit := storage.SearchHit{
+				VideoID:       result.Segment.VideoID,
+				StartMs:       result.Segment.StartMs,
+				EndMs:         result.Segment.EndMs,
+				Type:          result.Segment.Type,
+				Snippet:       result.Segment.Text,
+				Similarity:    weighted,
+				SourcePath:    result.Segment.SourcePath,
+				VisualContext: "",
+			}
+			if includeDebug {
+				hit.RawSimilarity = result.Score
+			}
+			if result.Segment.Type == storage.SegmentTypeVisual {
+				hit.VisualContext = result.Segment.Text
+			}
+
+			selected = append(selected, hit)
+			seen[key] = struct{}{}
+			if len(selected) >= limit {
+				break
+			}
+		}
+	}
+
 	return selected
 }
 
@@ -390,26 +430,162 @@ func lexicalMatchBoost(snippet, normalizedQuery string) float64 {
 	if normalizedSnippet == "" {
 		return 0
 	}
-	if normalizedSnippet == normalizedQuery {
-		return 5.0
-	}
-	if strings.Contains(normalizedSnippet, normalizedQuery) {
-		return 2.0
+
+	queryTokens := strings.Fields(normalizedQuery)
+	snippetTokens := strings.Fields(normalizedSnippet)
+
+	if len(queryTokens) == 0 || len(snippetTokens) == 0 {
+		return 0
 	}
 
-	return 0
+	boost := 0.0
+	if normalizedSnippet == normalizedQuery {
+		boost += 5.0
+	}
+	if strings.Contains(normalizedSnippet, normalizedQuery) {
+		boost += 2.0
+	}
+
+	querySet := makeTokenSet(queryTokens)
+	overlap := tokenOverlapCount(querySet, snippetTokens)
+	if overlap > 0 {
+		boost += 2.0
+		ratio := float64(overlap) / float64(len(querySet))
+		boost += ratio * 4.0
+		if overlap == len(querySet) {
+			boost += 2.0
+		}
+	}
+
+	queryBigrams := makeBigrams(queryTokens)
+	if len(queryBigrams) > 0 {
+		snippetBigrams := makeBigrams(snippetTokens)
+		bigramOverlap := tokenSetOverlapCount(queryBigrams, snippetBigrams)
+		if bigramOverlap > 0 {
+			boost += (float64(bigramOverlap) / float64(len(queryBigrams))) * 1.5
+		}
+	}
+
+	return boost
 }
 
 func normalizeSearchText(value string) string {
-	trimmed := strings.TrimSpace(strings.ToLower(value))
-	if trimmed == "" {
+	tokens := tokenizeSearchText(value)
+	if len(tokens) == 0 {
 		return ""
 	}
-	return strings.Join(strings.Fields(trimmed), " ")
+	return strings.Join(tokens, " ")
+}
+
+func tokenizeSearchText(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	var normalized strings.Builder
+	normalized.Grow(len(value))
+	for _, r := range strings.ToLower(value) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			normalized.WriteRune(r)
+			continue
+		}
+		normalized.WriteRune(' ')
+	}
+
+	parts := strings.Fields(normalized.String())
+	for i := range parts {
+		parts[i] = normalizeSearchToken(parts[i])
+	}
+	return parts
+}
+
+func normalizeSearchToken(token string) string {
+	switch token {
+	case "cost", "price", "pricing", "spend", "expense", "expenses", "financial", "finance":
+		return "budget"
+	case "plan", "planning", "timeline", "milestone", "milestones":
+		return "roadmap"
+	case "step", "steps":
+		return "actions"
+	case "summary", "wrap", "wrapup":
+		return "closing"
+	case "introduction", "opening":
+		return "intro"
+	case "chat", "conversation", "talk":
+		return "discussion"
+	case "uneasy", "awkward", "hesitant", "hesitation", "uncertain", "uncertainty":
+		return "tension"
+	default:
+		return token
+	}
+}
+
+func makeTokenSet(tokens []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(tokens))
+	for _, token := range tokens {
+		set[token] = struct{}{}
+	}
+	return set
+}
+
+func tokenOverlapCount(expected map[string]struct{}, actual []string) int {
+	if len(expected) == 0 || len(actual) == 0 {
+		return 0
+	}
+
+	seen := map[string]struct{}{}
+	count := 0
+	for _, token := range actual {
+		if _, ok := expected[token]; !ok {
+			continue
+		}
+		if _, already := seen[token]; already {
+			continue
+		}
+		seen[token] = struct{}{}
+		count++
+	}
+
+	return count
+}
+
+func makeBigrams(tokens []string) map[string]struct{} {
+	if len(tokens) < 2 {
+		return nil
+	}
+
+	bigrams := make(map[string]struct{}, len(tokens)-1)
+	for i := 1; i < len(tokens); i++ {
+		bigrams[tokens[i-1]+"_"+tokens[i]] = struct{}{}
+	}
+	return bigrams
+}
+
+func tokenSetOverlapCount(left map[string]struct{}, right map[string]struct{}) int {
+	if len(left) == 0 || len(right) == 0 {
+		return 0
+	}
+
+	count := 0
+	for token := range right {
+		if _, ok := left[token]; ok {
+			count++
+		}
+	}
+	return count
 }
 
 func weightedScore(result storage.SearchResult, ranking RankingOptions) float64 {
 	base := float64(result.Score)
+	if math.IsNaN(base) || math.IsInf(base, 0) {
+		base = 0
+	}
+	if base < 0 {
+		base = 0
+	}
+	if base > 1 {
+		base = 1
+	}
 	if result.Segment.Type == storage.SegmentTypeVisual {
 		return base * ranking.VisualWeight
 	}

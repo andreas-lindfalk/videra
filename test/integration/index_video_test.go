@@ -571,6 +571,35 @@ func (s *defaultIntegrationSuite) TestProofPackScenariosEvidenceAndDeterminism()
 	}
 }
 
+func (s *defaultIntegrationSuite) TestProofPackProductRecallPrioritizesTop2Evidence() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	resetIndex(t, ctx, cli)
+
+	indexResult, err := cli.CallTool(ctx, mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "index_video",
+			Arguments: map[string]any{
+				"path": "https://example.com/proofpack-product.mp4",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, indexResult.IsError)
+
+	results := searchAndExtractResults(t, ctx, cli, "intro segment discussion", 5)
+	require.GreaterOrEqual(t, len(results), 2)
+
+	firstSnippet := strings.ToLower(fmt.Sprintf("%v", results[0]["snippet"]))
+	secondSnippet := strings.ToLower(fmt.Sprintf("%v", results[1]["snippet"]))
+	topTwo := firstSnippet + "\n" + secondSnippet
+
+	require.Contains(t, topTwo, "intro segment")
+	require.Contains(t, topTwo, "discussion")
+}
+
 func (s *defaultIntegrationSuite) TestSearchVideoIncludeDebugMetadata() {
 	t := s.T()
 	ctx := s.ctx

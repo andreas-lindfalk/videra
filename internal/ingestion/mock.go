@@ -68,28 +68,25 @@ func (i *MockIngester) IndexVideo(ctx context.Context, path string) (storage.Vid
 	baseName := filepath.Base(path)
 	segments := []storage.Segment{
 		{
-			VideoID:   videoID,
-			StartMs:   0,
-			EndMs:     5000,
-			Text:      fmt.Sprintf("[simulated] Intro segment from %s", baseName),
-			Type:      storage.SegmentTypeAudio,
-			Embedding: []float32{0.11, 0.07, 0.33, 0.29, 0.42, 0.05, 0.19, 0.24},
+			VideoID: videoID,
+			StartMs: 0,
+			EndMs:   5000,
+			Text:    fmt.Sprintf("[simulated] Intro segment from %s", baseName),
+			Type:    storage.SegmentTypeAudio,
 		},
 		{
-			VideoID:   videoID,
-			StartMs:   5000,
-			EndMs:     10000,
-			Text:      "[simulated] Main discussion about roadmap and budget.",
-			Type:      storage.SegmentTypeAudio,
-			Embedding: []float32{0.09, 0.13, 0.21, 0.37, 0.18, 0.44, 0.28, 0.32},
+			VideoID: videoID,
+			StartMs: 5000,
+			EndMs:   10000,
+			Text:    "[simulated] Main discussion about roadmap and budget.",
+			Type:    storage.SegmentTypeAudio,
 		},
 		{
-			VideoID:   videoID,
-			StartMs:   10000,
-			EndMs:     15000,
-			Text:      "[simulated] Closing remarks and next actions.",
-			Type:      storage.SegmentTypeAudio,
-			Embedding: []float32{0.14, 0.22, 0.31, 0.16, 0.41, 0.08, 0.27, 0.35},
+			VideoID: videoID,
+			StartMs: 10000,
+			EndMs:   15000,
+			Text:    "[simulated] Closing remarks and next actions.",
+			Type:    storage.SegmentTypeAudio,
 		},
 	}
 

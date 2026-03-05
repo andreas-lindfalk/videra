@@ -202,3 +202,8 @@
 
 - **Capture release evidence from command outputs + exit codes together.** Storing deterministic gate logs and explicit exit status per command makes RC go/no-go decisions auditable instead of narrative.
 - **Keep split-role checks as a first-class gate artifact.** Recording focused split-role pass results alongside full release-gate output preserves control-plane/data-plane confidence for operators.
+
+## 2026-03-05 — Semantic Reranking Guardrail
+
+- **Modality diversity should not suppress strong lexical evidence.** Diversity heuristics for early result slots must yield when same-modality hits have clear query-token relevance, or proofpack evidence quality can regress.
+- **Fallback recall + deterministic reranking is safer than vector-only candidate reliance in mixed-fidelity embeddings.** Enriching candidates with transcript fallback before reranking improves robustness without changing MCP contracts.

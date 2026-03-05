@@ -183,7 +183,12 @@ func (s *ChromemStore) SearchSegments(ctx context.Context, queryEmbedding []floa
 
 	results, err := collection.QueryEmbedding(ctx, queryEmbedding, limit, nil, nil)
 	if err == nil && len(results) > 0 {
-		return mapChromemResults(results), nil
+		mapped := mapChromemResults(results)
+		fallback := s.fallbackSegments(limit)
+		combined := make([]SearchResult, 0, len(mapped)+len(fallback))
+		combined = append(combined, mapped...)
+		combined = append(combined, fallback...)
+		return combined, nil
 	}
 
 	if s.syncShared {
