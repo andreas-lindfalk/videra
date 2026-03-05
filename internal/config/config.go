@@ -36,10 +36,18 @@ const (
 	JobQueueRoleWorker JobQueueRole = "worker"
 )
 
+type StorageBackend string
+
+const (
+	StorageBackendChromem StorageBackend = "chromem"
+	StorageBackendLanceDB StorageBackend = "lancedb"
+)
+
 type Config struct {
 	Transport             Transport
 	HTTPAddr              string
 	DataDir               string
+	StorageBackend        StorageBackend
 	LogLevel              string
 	RuntimeMode           string
 	IngestionMode         IngestionMode
@@ -77,6 +85,7 @@ func Load() (Config, error) {
 		Transport:             TransportStdio,
 		HTTPAddr:              ":8080",
 		DataDir:               "./data",
+		StorageBackend:        StorageBackendChromem,
 		LogLevel:              "info",
 		RuntimeMode:           "local",
 		IngestionMode:         IngestionModeSimulated,
@@ -117,6 +126,9 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_DATA_DIR"); ok {
 		cfg.DataDir = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_STORAGE_BACKEND"); ok {
+		cfg.StorageBackend = StorageBackend(strings.ToLower(strings.TrimSpace(value)))
 	}
 	if value, ok := os.LookupEnv("VIDERA_LOG_LEVEL"); ok {
 		cfg.LogLevel = strings.ToLower(strings.TrimSpace(value))
@@ -259,6 +271,9 @@ func Load() (Config, error) {
 	}
 	if cfg.DataDir == "" {
 		return Config{}, fmt.Errorf("VIDERA_DATA_DIR cannot be empty")
+	}
+	if cfg.StorageBackend != StorageBackendChromem && cfg.StorageBackend != StorageBackendLanceDB {
+		return Config{}, fmt.Errorf("unsupported VIDERA_STORAGE_BACKEND: %s", cfg.StorageBackend)
 	}
 	if cfg.FrameIntervalSec <= 0 {
 		return Config{}, fmt.Errorf("VIDERA_FRAME_INTERVAL_SEC must be > 0")

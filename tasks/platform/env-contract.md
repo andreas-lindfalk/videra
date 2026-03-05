@@ -7,6 +7,7 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_TRANSPORT` (`stdio` | `http`)
 - `VIDERA_HTTP_ADDR` (e.g. `:8080`)
 - `VIDERA_DATA_DIR` (persistent data path)
+- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`, default `chromem`; `lancedb` currently maps to a compatibility layer backed by `chromem-go` in a backend-scoped data directory)
 - `VIDERA_LOG_LEVEL` (`debug|info|warn|error`)
 - `VIDERA_RUNTIME_MODE` (`local|test|prod`)
 - `VIDERA_INGESTION_MODE` (`simulated|real`)

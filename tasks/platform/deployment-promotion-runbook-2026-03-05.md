@@ -47,9 +47,14 @@ Store dated artifacts as:
 
 - `tasks/platform/deployment-promotion-evidence-YYYY-MM-DD.md`
 
+Then finalize cross-environment decision summary using:
+
+- `tasks/platform/cross-environment-promotion-summary-template.md`
+
 ## Related Artifacts
 
 - `tasks/platform/mvp-release-gate.md`
 - `tasks/platform/real-corpus-promotion-gate-2026-03-05.md`
 - `tasks/platform/release-quality-coupling-evidence-2026-03-05.md`
 - `tasks/platform/real-corpus-promotion-evidence-2026-03-05.md`
+- `tasks/platform/cross-environment-promotion-summary-runbook-2026-03-05.md`

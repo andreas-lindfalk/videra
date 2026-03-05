@@ -62,19 +62,16 @@ Why it matters:
 - Real-corpus promotion criteria + evidence format: in place (Phase 28).
 - Storage decision re-checkpoint: completed with NO-GO for immediate migration (Phase 29).
 - Deployment promotion workflow consolidation: completed (Phase 30).
-- Remaining gap: storage benchmark inputs for any future migration decision refresh.
+- Storage benchmark harness baseline: completed (Phase 31).
+- Cross-environment promotion evidence unification: completed (Phase 33).
+- Phase 32 activation checkpoint (2026-03-06): NO-GO; phase is now closed/parked.
+- Remaining gap: execute real Hetzner + Cloud Run parity runs and finalize cross-environment promotion decision.
+- Phase 32 closure artifacts:
+	- `tasks/platform/phase-32-conditional-storage-migration-tracker-2026-03-05.md`
+	- `tasks/platform/phase-32-activation-checkpoint-2026-03-06.md`
+	- `tasks/archive/2026-03-06-phase-32-conditional-storage-migration-closure-no-go.md`
 
 ## Next Planned Phases
-
-### Phase 31 — Storage Benchmark Harness (Decision Refresh Input)
-
-Goal:
-
-- Produce repeatable backend comparison benchmarks required for a future storage checkpoint re-open.
-
-Expected outcome:
-
-- Measured artifact set that can satisfy migration GO criteria when/if benefits are proven.
 
 ### Phase 32 — Conditional Storage Migration Track (Only if a future checkpoint = GO)
 
@@ -86,6 +83,8 @@ Expected outcome:
 
 - Measured migration outcome with parity/quality validation and documented rollback readiness.
 
+Current state: closed NO-GO (parked pending re-open trigger).
+
 ### Phase 33 — Cross-Environment Promotion Evidence Unification
 
 Goal:
@@ -95,6 +94,20 @@ Goal:
 Expected outcome:
 
 - Faster and clearer GO/NO-GO review across environments.
+
+Status: completed (Phase 33).
+
+### Phase 34 — Cross-Environment Parity Execution (Hetzner + Cloud Run)
+
+Goal:
+
+- Execute parity checklist in both environments and finalize unified cross-environment promotion decision.
+
+Expected outcome:
+
+- `cross-environment-promotion-summary` updated from CONDITIONAL to final GO/NO-GO with dated parity evidence links.
+
+Status: active.
 
 ## Guardrails for Upcoming Work
 

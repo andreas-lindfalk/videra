@@ -56,4 +56,7 @@ Rationale:
 
 - Keep storage migration out of active implementation until GO criteria are met.
 - Use Phase 30 for promotion/runbook consolidation.
+- Use Phase 31 storage benchmark harness outputs as decision-refresh input:
+	- `tasks/platform/storage-benchmark-harness-2026-03-05.md`
+	- `tasks/platform/storage-benchmark-evidence-2026-03-05.md`
 - Re-open storage migration only via an explicit checkpoint update with benchmark artifacts.

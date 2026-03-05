@@ -24,6 +24,7 @@ This artifact explains:
 - In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
 - `index_video` supports `mode=async` for non-blocking indexing; poll status via `get_index_job` using returned `jobId`.
 - Async queue backend is runtime-selectable via `VIDERA_JOBQUEUE_BACKEND` (`inprocess` default; `nats` and `redis` available), with runtime role split support via `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`).
+- Storage backend is runtime-selectable via `VIDERA_STORAGE_BACKEND` (`chromem` default). `lancedb` now runs through a compatibility layer backed by `chromem-go` in a backend-scoped data path.
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 - Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
@@ -138,6 +139,7 @@ Practical flow:
 - Pilot quality gate (benchmark + real-mode guardrails): `make pilot-quality-gate`
 - Real-corpus promotion gate: `make real-corpus-promotion-gate`
 - Deployment promotion gate (consolidated): `make deployment-promotion-gate`
+- Storage benchmark gate (decision-refresh input): `make storage-benchmark-gate`
 - MVP release gate (full): `make release-gate`
 - MVP split-role critical checks: `make release-gate-split`
 - MVP release gate preflight: `make release-gate-preflight`
@@ -213,6 +215,7 @@ Example initiation payload:
 
 Queue runtime environment options (Phase 12):
 
+- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`; default `chromem`)
 - `VIDERA_JOBQUEUE_BACKEND` (`inprocess|nats|redis`; default `inprocess`)
 - `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`; default `all`)
 - `VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS` (default `3`)
@@ -323,3 +326,26 @@ Related artifacts:
 
 - `tasks/platform/deployment-promotion-runbook-2026-03-05.md`
 - `tasks/platform/deployment-promotion-evidence-template.md`
+
+## Storage Benchmark Harness (Phase 31)
+
+Decision-refresh benchmark command:
+
+```bash
+make storage-benchmark-gate
+```
+
+Related artifacts:
+
+- `tasks/platform/storage-benchmark-harness-2026-03-05.md`
+- `tasks/platform/storage-benchmark-evidence-template.md`
+
+## Cross-Environment Promotion Summary (Phase 33)
+
+Preferred final deployment decision handoff format:
+
+- `tasks/platform/cross-environment-promotion-summary-template.md`
+
+Runbook:
+
+- `tasks/platform/cross-environment-promotion-summary-runbook-2026-03-05.md`

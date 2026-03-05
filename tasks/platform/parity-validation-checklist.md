@@ -112,6 +112,14 @@ Notes:
 - No unexplained response-contract differences between environments.
 - Determinism check passes where indexing/search is supported.
 
+## Final Decision Summary (Phase 33)
+
+After completing parity checks and local promotion gates, write one unified decision artifact using:
+
+- `tasks/platform/cross-environment-promotion-summary-template.md`
+
+This is the preferred final GO/NO-GO handoff format for cross-environment promotion review.
+
 ## Split-Role Release-Critical Add-on
 
 Before final MVP go/no-go, also run:

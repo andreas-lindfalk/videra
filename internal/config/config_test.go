@@ -10,6 +10,7 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	t.Setenv("VIDERA_TRANSPORT", "stdio")
 	t.Setenv("VIDERA_HTTP_ADDR", ":8080")
 	t.Setenv("VIDERA_DATA_DIR", "./data")
+	t.Setenv("VIDERA_STORAGE_BACKEND", "chromem")
 	t.Setenv("VIDERA_LOG_LEVEL", "info")
 	t.Setenv("VIDERA_RUNTIME_MODE", "local")
 	t.Setenv("VIDERA_INGESTION_MODE", "simulated")
@@ -29,6 +30,7 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.Equal(t, TransportStdio, cfg.Transport)
 	require.Equal(t, ":8080", cfg.HTTPAddr)
 	require.Equal(t, "./data", cfg.DataDir)
+	require.Equal(t, StorageBackendChromem, cfg.StorageBackend)
 	require.Equal(t, "local", cfg.RuntimeMode)
 	require.Equal(t, IngestionModeSimulated, cfg.IngestionMode)
 	require.True(t, cfg.RemoteFetchEnabled)
@@ -48,6 +50,22 @@ func TestLoadInvalidTransportStillFails(t *testing.T) {
 	_, err := Load()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported VIDERA_TRANSPORT")
+}
+
+func TestLoadParsesStorageBackendLanceDB(t *testing.T) {
+	t.Setenv("VIDERA_STORAGE_BACKEND", "lancedb")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, StorageBackendLanceDB, cfg.StorageBackend)
+}
+
+func TestLoadInvalidStorageBackendFails(t *testing.T) {
+	t.Setenv("VIDERA_STORAGE_BACKEND", "kafka")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported VIDERA_STORAGE_BACKEND")
 }
 
 func TestLoadInvalidIngestionModeFails(t *testing.T) {

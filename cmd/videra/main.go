@@ -48,11 +48,30 @@ func run() error {
 	}
 
 	storeEmbedder := embedding.NewDeterministicTextEmbedderWithCanonicalTokens(cfg.SemanticCanonicalMap)
-	store, err := storage.NewChromemStoreWithOptions(cfg.DataDir, storeEmbedder, storage.ChromemStoreOptions{
-		SplitSharedStorage: cfg.SplitSharedStorage,
-	})
-	if err != nil {
-		return fmt.Errorf("initialize store: %w", err)
+
+	var store storage.VectorStore
+	switch cfg.StorageBackend {
+	case config.StorageBackendChromem:
+		store, err = storage.NewChromemStoreWithOptions(cfg.DataDir, storeEmbedder, storage.ChromemStoreOptions{
+			SplitSharedStorage: cfg.SplitSharedStorage,
+		})
+		if err != nil {
+			return fmt.Errorf("initialize chromem store: %w", err)
+		}
+	case config.StorageBackendLanceDB:
+		store, err = storage.NewLanceDBStoreWithOptions(cfg.DataDir, storeEmbedder, storage.LanceDBStoreOptions{
+			SplitSharedStorage: cfg.SplitSharedStorage,
+		})
+		if err != nil {
+			return fmt.Errorf("initialize lancedb compatibility store: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported storage backend: %s", cfg.StorageBackend)
+	}
+	if cfg.StorageBackend == config.StorageBackendLanceDB {
+		log.Printf("storage backend: %s (compatibility layer via chromem-go)", cfg.StorageBackend)
+	} else {
+		log.Printf("storage backend: %s", cfg.StorageBackend)
 	}
 
 	indexOptions := ingestion.IndexOptions{

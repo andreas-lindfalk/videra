@@ -238,6 +238,16 @@
 - **Keep a living North Star artifact in-repo.** Teams move faster when each phase maps directly to target-state outcomes instead of only to technical tasks.
 - **Track phase purpose and endpoint together.** For each phase, make explicit what capability it adds and which final release criterion it advances.
 
+## 2026-03-06 — Checkpoint Closure Discipline
+
+- **Blocked phases need explicit activation verdict artifacts.** Recording a dated GO/NO-GO checkpoint avoids ambiguity between "in progress" and "intentionally paused" states.
+- **A single unmet hard-gate criterion should be surfaced as the only blocker.** This keeps re-open conditions clear and prevents churn on already-passing prerequisites.
+
+## 2026-03-05 — Candidate Mode Execution Hardening
+
+- **Default-value config tests must pin env-sensitive fields explicitly.** Candidate-mode gate runs can export `VIDERA_STORAGE_BACKEND`; tests expecting defaults should set `VIDERA_STORAGE_BACKEND=chromem` to avoid inherited-env false failures.
+- **Composite Make recipes should use fail-fast shell behavior.** Multi-step capture targets that are intended as gates should include `set -e` so sub-step failures do not emit misleading success messages.
+
 ## 2026-03-05 — Release Decision Signal Coupling
 
 - **Do not treat operational pass/fail as sufficient release proof.** Couple release gates with a compact retrieval-quality signal so GO decisions reflect both reliability and result quality.
@@ -257,3 +267,13 @@
 
 - **One-command operator flows reduce decision drift.** Wrapping release, split-role, and promotion gates into a single command improves repeatability and handoff quality.
 - **Evidence templates should match command composition.** Consolidated commands need consolidated evidence artifacts to keep GO/NO-GO review fast and auditable.
+
+## 2026-03-05 — Storage Benchmark Harness Discipline
+
+- **Benchmark workload names should be stable across backend candidates.** Reusing identical benchmark case names keeps cross-backend comparisons auditable and less interpretation-heavy.
+- **Decision-refresh baselines need both raw logs and summarized metrics.** Capturing output files plus normalized evidence summaries improves future checkpoint reruns.
+
+## 2026-03-05 — Cross-Environment Evidence Unification
+
+- **Use one final decision artifact across environments.** Merging local promotion and deployment parity status into one summary reduces ambiguous GO/NO-GO handoffs.
+- **Allow conditional status only with explicit follow-up actions.** Pending environment runs should be visible, bounded, and tied to concrete next steps.
