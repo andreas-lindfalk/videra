@@ -11,43 +11,22 @@ type TextEmbedder interface {
 	EmbedText(ctx context.Context, text string) ([]float32, error)
 }
 
-type DeterministicTextEmbedder struct{}
+type DeterministicTextEmbedder struct {
+	canonicalTokens map[string]string
+}
 
 const embeddingDimensions = 8
 
-var semanticCanonicalTokens = map[string]string{
-	"cost":         "budget",
-	"price":        "budget",
-	"pricing":      "budget",
-	"spend":        "budget",
-	"expense":      "budget",
-	"expenses":     "budget",
-	"financial":    "budget",
-	"finance":      "budget",
-	"planning":     "roadmap",
-	"plan":         "roadmap",
-	"timeline":     "roadmap",
-	"milestone":    "roadmap",
-	"milestones":   "roadmap",
-	"actions":      "actions",
-	"steps":        "actions",
-	"step":         "actions",
-	"summary":      "closing",
-	"wrapup":       "closing",
-	"wrap":         "closing",
-	"introduction": "intro",
-	"opening":      "intro",
-	"chat":         "discussion",
-	"conversation": "discussion",
-	"talk":         "discussion",
+func NewDeterministicTextEmbedder() *DeterministicTextEmbedder {
+	return NewDeterministicTextEmbedderWithCanonicalTokens(nil)
 }
 
-func NewDeterministicTextEmbedder() *DeterministicTextEmbedder {
-	return &DeterministicTextEmbedder{}
+func NewDeterministicTextEmbedderWithCanonicalTokens(canonicalTokens map[string]string) *DeterministicTextEmbedder {
+	return &DeterministicTextEmbedder{canonicalTokens: normalizeCanonicalTokens(canonicalTokens)}
 }
 
 func (e *DeterministicTextEmbedder) EmbedText(_ context.Context, text string) ([]float32, error) {
-	tokens := tokenizeAndNormalize(text)
+	tokens := e.tokenizeAndNormalize(text)
 	if len(tokens) == 0 {
 		tokens = []string{"empty"}
 	}
@@ -65,7 +44,7 @@ func (e *DeterministicTextEmbedder) EmbedText(_ context.Context, text string) ([
 	return out, nil
 }
 
-func tokenizeAndNormalize(text string) []string {
+func (e *DeterministicTextEmbedder) tokenizeAndNormalize(text string) []string {
 	if strings.TrimSpace(text) == "" {
 		return nil
 	}
@@ -86,17 +65,35 @@ func tokenizeAndNormalize(text string) []string {
 	}
 
 	for i := range parts {
-		parts[i] = normalizeToken(parts[i])
+		parts[i] = e.normalizeToken(parts[i])
 	}
 
 	return parts
 }
 
-func normalizeToken(token string) string {
-	if canonical, ok := semanticCanonicalTokens[token]; ok {
+func (e *DeterministicTextEmbedder) normalizeToken(token string) string {
+	if canonical, ok := e.canonicalTokens[token]; ok {
 		return canonical
 	}
 	return token
+}
+
+func normalizeCanonicalTokens(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return map[string]string{}
+	}
+
+	out := make(map[string]string, len(input))
+	for key, canonical := range input {
+		normalizedKey := strings.ToLower(strings.TrimSpace(key))
+		normalizedCanonical := strings.ToLower(strings.TrimSpace(canonical))
+		if normalizedKey == "" || normalizedCanonical == "" {
+			continue
+		}
+		out[normalizedKey] = normalizedCanonical
+	}
+
+	return out
 }
 
 func addHashedFeature(vector []float32, feature string, weight float32) {

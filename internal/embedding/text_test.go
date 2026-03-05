@@ -34,7 +34,11 @@ func TestDeterministicTextEmbedderDistinctInputs(t *testing.T) {
 
 func TestDeterministicTextEmbedderSemanticNeighboring(t *testing.T) {
 	ctx := context.Background()
-	embedder := NewDeterministicTextEmbedder()
+	embedder := NewDeterministicTextEmbedderWithCanonicalTokens(map[string]string{
+		"cost":     "budget",
+		"planning": "roadmap",
+		"steps":    "actions",
+	})
 
 	anchor, err := embedder.EmbedText(ctx, "budget roadmap next actions")
 	require.NoError(t, err)
@@ -49,6 +53,19 @@ func TestDeterministicTextEmbedderSemanticNeighboring(t *testing.T) {
 	farSimilarity := cosine(anchor, far)
 
 	require.Greater(t, nearSimilarity, farSimilarity)
+}
+
+func TestDeterministicTextEmbedderDefaultIsDomainNeutral(t *testing.T) {
+	ctx := context.Background()
+	embedder := NewDeterministicTextEmbedder()
+
+	price, err := embedder.EmbedText(ctx, "price planning")
+	require.NoError(t, err)
+
+	budget, err := embedder.EmbedText(ctx, "budget roadmap")
+	require.NoError(t, err)
+
+	require.NotEqual(t, price, budget)
 }
 
 func cosine(left, right []float32) float64 {

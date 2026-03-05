@@ -142,6 +142,25 @@ func TestLoadParsesSplitSharedStorageFlag(t *testing.T) {
 	require.True(t, cfg.SplitSharedStorage)
 }
 
+func TestLoadParsesSemanticCanonicalMap(t *testing.T) {
+	t.Setenv("VIDERA_SEMANTIC_CANONICAL_MAP", "cats=felines,kitty=felines")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"cats":  "felines",
+		"kitty": "felines",
+	}, cfg.SemanticCanonicalMap)
+}
+
+func TestLoadInvalidSemanticCanonicalMapFails(t *testing.T) {
+	t.Setenv("VIDERA_SEMANTIC_CANONICAL_MAP", "cats")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid VIDERA_SEMANTIC_CANONICAL_MAP")
+}
+
 func TestLoadInvalidSplitSharedStorageFlagFails(t *testing.T) {
 	t.Setenv("VIDERA_SPLIT_SHARED_STORAGE", "maybe")
 

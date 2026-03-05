@@ -15,6 +15,7 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_INDEX_CONCURRENCY` (default `4`)
 - `VIDERA_SEARCH_AUDIO_WEIGHT` (default `1.0`)
 - `VIDERA_SEARCH_VISUAL_WEIGHT` (default `1.0`)
+- `VIDERA_SEMANTIC_CANONICAL_MAP` (optional, default empty/off; comma-separated `source=canonical` pairs)
 
 ## Real-Ingestion Extras
 

@@ -75,7 +75,14 @@ func TestRerankHybridResultsSynonymBoostsNextActions(t *testing.T) {
 		{Segment: storage.Segment{VideoID: "v1", StartMs: 1000, EndMs: 2000, Type: storage.SegmentTypeAudio, Text: "closing remarks and next actions after budget discussion"}, Score: 0.35},
 	}
 
-	hits := rerankHybridResults(input, "price concerns next steps", 2, RankingOptions{AudioWeight: 1.0, VisualWeight: 1.0}, false)
+	hits := rerankHybridResults(input, "price concerns next steps", 2, RankingOptions{
+		AudioWeight:  1.0,
+		VisualWeight: 1.0,
+		CanonicalTokens: map[string]string{
+			"price": "budget",
+			"steps": "actions",
+		},
+	}, false)
 	require.NotEmpty(t, hits)
 	require.Contains(t, hits[0].Snippet, "next actions")
 	require.Equal(t, storage.SegmentTypeAudio, hits[0].Type)

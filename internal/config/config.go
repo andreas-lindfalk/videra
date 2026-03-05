@@ -51,6 +51,7 @@ type Config struct {
 	IndexConcurrency      int
 	SearchAudioWeight     float64
 	SearchVisualWeight    float64
+	SemanticCanonicalMap  map[string]string
 	JobQueueBackend       JobQueueBackend
 	JobQueueRole          JobQueueRole
 	JobQueueRetryMax      int
@@ -87,6 +88,7 @@ func Load() (Config, error) {
 		IndexConcurrency:      4,
 		SearchAudioWeight:     1.0,
 		SearchVisualWeight:    1.0,
+		SemanticCanonicalMap:  map[string]string{},
 		JobQueueBackend:       JobQueueBackendInProcess,
 		JobQueueRole:          JobQueueRoleAll,
 		JobQueueRetryMax:      3,
@@ -170,6 +172,13 @@ func Load() (Config, error) {
 		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%f", &cfg.SearchVisualWeight); err != nil {
 			return Config{}, fmt.Errorf("invalid VIDERA_SEARCH_VISUAL_WEIGHT: %w", err)
 		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_SEMANTIC_CANONICAL_MAP"); ok {
+		parsed, err := parseCanonicalMap(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_SEMANTIC_CANONICAL_MAP: %w", err)
+		}
+		cfg.SemanticCanonicalMap = parsed
 	}
 	if value, ok := os.LookupEnv("VIDERA_JOBQUEUE_BACKEND"); ok {
 		cfg.JobQueueBackend = JobQueueBackend(strings.ToLower(strings.TrimSpace(value)))
@@ -334,4 +343,35 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func parseCanonicalMap(value string) (map[string]string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return map[string]string{}, nil
+	}
+
+	entries := strings.Split(trimmed, ",")
+	out := make(map[string]string, len(entries))
+	for _, entry := range entries {
+		pair := strings.TrimSpace(entry)
+		if pair == "" {
+			continue
+		}
+
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("entry %q must use key=value format", pair)
+		}
+
+		key := strings.ToLower(strings.TrimSpace(parts[0]))
+		canonical := strings.ToLower(strings.TrimSpace(parts[1]))
+		if key == "" || canonical == "" {
+			return nil, fmt.Errorf("entry %q has empty key or value", pair)
+		}
+
+		out[key] = canonical
+	}
+
+	return out, nil
 }

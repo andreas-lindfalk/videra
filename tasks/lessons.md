@@ -207,3 +207,8 @@
 
 - **Modality diversity should not suppress strong lexical evidence.** Diversity heuristics for early result slots must yield when same-modality hits have clear query-token relevance, or proofpack evidence quality can regress.
 - **Fallback recall + deterministic reranking is safer than vector-only candidate reliance in mixed-fidelity embeddings.** Enriching candidates with transcript fallback before reranking improves robustness without changing MCP contracts.
+
+## 2026-03-05 — Domain-Neutral Normalization Default
+
+- **Core normalization should be neutral by default.** Hardcoded topic synonym maps in the default path can bias retrieval for unrelated corpora.
+- **Domain mapping belongs in explicit runtime config.** Optional canonical maps keep behavior adaptable without forcing assumptions across all datasets.

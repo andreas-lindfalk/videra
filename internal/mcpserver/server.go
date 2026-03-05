@@ -26,8 +26,9 @@ type Server struct {
 }
 
 type RankingOptions struct {
-	AudioWeight  float64
-	VisualWeight float64
+	AudioWeight     float64
+	VisualWeight    float64
+	CanonicalTokens map[string]string
 }
 
 func New(name, version string, orchestrator ingestion.IndexOrchestrator, store storage.VectorStore, defaultSearchLimit int, runtimeMode string, ranking RankingOptions) *Server {
@@ -40,6 +41,7 @@ func New(name, version string, orchestrator ingestion.IndexOrchestrator, store s
 	if ranking.VisualWeight <= 0 {
 		ranking.VisualWeight = 1.0
 	}
+	ranking.CanonicalTokens = normalizeCanonicalTokens(ranking.CanonicalTokens)
 
 	mcpServer := server.NewMCPServer(
 		name,
@@ -310,13 +312,13 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 	if ranking.VisualWeight <= 0 {
 		ranking.VisualWeight = 1.0
 	}
-	normalizedQuery := normalizeSearchText(query)
+	normalizedQuery := normalizeSearchText(query, ranking.CanonicalTokens)
 
 	sorted := make([]storage.SearchResult, 0, len(results))
 	sorted = append(sorted, results...)
 	sort.SliceStable(sorted, func(i, j int) bool {
-		left := weightedScore(sorted[i], ranking) + lexicalMatchBoost(sorted[i].Segment.Text, normalizedQuery)
-		right := weightedScore(sorted[j], ranking) + lexicalMatchBoost(sorted[j].Segment.Text, normalizedQuery)
+		left := weightedScore(sorted[i], ranking) + lexicalMatchBoost(sorted[i].Segment.Text, normalizedQuery, ranking.CanonicalTokens)
+		right := weightedScore(sorted[j], ranking) + lexicalMatchBoost(sorted[j].Segment.Text, normalizedQuery, ranking.CanonicalTokens)
 		if left != right {
 			return left > right
 		}
@@ -344,7 +346,7 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 			continue
 		}
 
-		lexical := lexicalMatchBoost(result.Segment.Text, normalizedQuery)
+		lexical := lexicalMatchBoost(result.Segment.Text, normalizedQuery, ranking.CanonicalTokens)
 
 		if len(selected) < 2 {
 			if lexical == 0 && result.Segment.Type == storage.SegmentTypeAudio && hasAudio {
@@ -393,7 +395,7 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 				continue
 			}
 
-			weighted := float32(weightedScore(result, ranking) + lexicalMatchBoost(result.Segment.Text, normalizedQuery))
+			weighted := float32(weightedScore(result, ranking) + lexicalMatchBoost(result.Segment.Text, normalizedQuery, ranking.CanonicalTokens))
 			hit := storage.SearchHit{
 				VideoID:       result.Segment.VideoID,
 				StartMs:       result.Segment.StartMs,
@@ -422,11 +424,11 @@ func rerankHybridResults(results []storage.SearchResult, query string, limit int
 	return selected
 }
 
-func lexicalMatchBoost(snippet, normalizedQuery string) float64 {
+func lexicalMatchBoost(snippet, normalizedQuery string, canonicalTokens map[string]string) float64 {
 	if normalizedQuery == "" {
 		return 0
 	}
-	normalizedSnippet := normalizeSearchText(snippet)
+	normalizedSnippet := normalizeSearchText(snippet, canonicalTokens)
 	if normalizedSnippet == "" {
 		return 0
 	}
@@ -469,15 +471,15 @@ func lexicalMatchBoost(snippet, normalizedQuery string) float64 {
 	return boost
 }
 
-func normalizeSearchText(value string) string {
-	tokens := tokenizeSearchText(value)
+func normalizeSearchText(value string, canonicalTokens map[string]string) string {
+	tokens := tokenizeSearchText(value, canonicalTokens)
 	if len(tokens) == 0 {
 		return ""
 	}
 	return strings.Join(tokens, " ")
 }
 
-func tokenizeSearchText(value string) []string {
+func tokenizeSearchText(value string, canonicalTokens map[string]string) []string {
 	if strings.TrimSpace(value) == "" {
 		return nil
 	}
@@ -494,30 +496,34 @@ func tokenizeSearchText(value string) []string {
 
 	parts := strings.Fields(normalized.String())
 	for i := range parts {
-		parts[i] = normalizeSearchToken(parts[i])
+		parts[i] = normalizeSearchToken(parts[i], canonicalTokens)
 	}
 	return parts
 }
 
-func normalizeSearchToken(token string) string {
-	switch token {
-	case "cost", "price", "pricing", "spend", "expense", "expenses", "financial", "finance":
-		return "budget"
-	case "plan", "planning", "timeline", "milestone", "milestones":
-		return "roadmap"
-	case "step", "steps":
-		return "actions"
-	case "summary", "wrap", "wrapup":
-		return "closing"
-	case "introduction", "opening":
-		return "intro"
-	case "chat", "conversation", "talk":
-		return "discussion"
-	case "uneasy", "awkward", "hesitant", "hesitation", "uncertain", "uncertainty":
-		return "tension"
-	default:
-		return token
+func normalizeSearchToken(token string, canonicalTokens map[string]string) string {
+	if canonical, ok := canonicalTokens[token]; ok {
+		return canonical
 	}
+	return token
+}
+
+func normalizeCanonicalTokens(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return map[string]string{}
+	}
+
+	out := make(map[string]string, len(input))
+	for key, canonical := range input {
+		normalizedKey := strings.ToLower(strings.TrimSpace(key))
+		normalizedCanonical := strings.ToLower(strings.TrimSpace(canonical))
+		if normalizedKey == "" || normalizedCanonical == "" {
+			continue
+		}
+		out[normalizedKey] = normalizedCanonical
+	}
+
+	return out
 }
 
 func makeTokenSet(tokens []string) map[string]struct{} {

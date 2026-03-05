@@ -207,6 +207,9 @@ Queue runtime environment options (Phase 12):
 - Redis options: `VIDERA_JOBQUEUE_REDIS_ADDR`, `VIDERA_JOBQUEUE_REDIS_PASSWORD`, `VIDERA_JOBQUEUE_REDIS_DB`, `VIDERA_JOBQUEUE_REDIS_STREAM`, `VIDERA_JOBQUEUE_REDIS_GROUP`, `VIDERA_JOBQUEUE_REDIS_CONSUMER`
 - Redis job-state option: `VIDERA_JOBSTATE_REDIS_PREFIX`
 - Split-role shared data-plane option: `VIDERA_SPLIT_SHARED_STORAGE` (`false` default)
+- Optional domain canonical map for token normalization: `VIDERA_SEMANTIC_CANONICAL_MAP` (default empty/off)
+	- Format: comma-separated `source=canonical` pairs
+	- Example: `VIDERA_SEMANTIC_CANONICAL_MAP="kitty=cat,kittens=cat,feline=cat"`
 
 Role notes:
 

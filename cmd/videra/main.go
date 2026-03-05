@@ -47,7 +47,8 @@ func run() error {
 		}
 	}
 
-	store, err := storage.NewChromemStoreWithOptions(cfg.DataDir, embedding.NewDeterministicTextEmbedder(), storage.ChromemStoreOptions{
+	storeEmbedder := embedding.NewDeterministicTextEmbedderWithCanonicalTokens(cfg.SemanticCanonicalMap)
+	store, err := storage.NewChromemStoreWithOptions(cfg.DataDir, storeEmbedder, storage.ChromemStoreOptions{
 		SplitSharedStorage: cfg.SplitSharedStorage,
 	})
 	if err != nil {
@@ -117,8 +118,9 @@ func run() error {
 	}
 
 	mcpSrv := mcpserver.New(serverName, serverVersion, orchestrator, store, cfg.DefaultSearchLimit, cfg.RuntimeMode, mcpserver.RankingOptions{
-		AudioWeight:  cfg.SearchAudioWeight,
-		VisualWeight: cfg.SearchVisualWeight,
+		AudioWeight:     cfg.SearchAudioWeight,
+		VisualWeight:    cfg.SearchVisualWeight,
+		CanonicalTokens: cfg.SemanticCanonicalMap,
 	})
 
 	switch cfg.Transport {
