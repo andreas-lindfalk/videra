@@ -227,3 +227,8 @@
 
 - **Keep pilot benchmark packs fixture-driven and measurable.** A small curated scenario slice with explicit evidence targets provides faster and more reliable tuning feedback than ad-hoc query checks.
 - **Gate tuning changes on metric thresholds, not intuition.** Preserve neutral defaults unless benchmark scorecards show concrete degradation signals that justify domain-specific mapping.
+
+## 2026-03-05 — Quality Gate Operationalization
+
+- **Promote repeated validation flows to one-command targets.** Packaging stable integration subsets into a dedicated `make` target reduces execution drift and makes operator handoffs more reliable.
+- **Keep composed gates contract-focused.** Combining benchmark quality checks with ingestion guardrails in one run provides a clearer GO/NO-GO signal without broad, expensive full-suite runs.

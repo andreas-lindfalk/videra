@@ -122,6 +122,7 @@ Practical flow:
 - Fast tests: `make test`
 - Integration tests: `make integration-test`
 - Integration tests (fresh run): `make integration-test-fresh`
+- Pilot quality gate (benchmark + real-mode guardrails): `make pilot-quality-gate`
 - MVP release gate (full): `make release-gate`
 - MVP split-role critical checks: `make release-gate-split`
 - MVP release gate preflight: `make release-gate-preflight`
@@ -268,3 +269,16 @@ Related phase artifacts:
 
 - `tasks/platform/real-corpus-onboarding-checklist-2026-03-05.md`
 - `tasks/platform/real-corpus-quality-gate-2026-03-05.md`
+
+## Pilot Quality Gate (Phase 25)
+
+Single command for pilot benchmark scorecard + real-mode ingestion guardrails:
+
+```bash
+make pilot-quality-gate
+```
+
+Related phase artifacts:
+
+- `tasks/platform/pilot-corpus-benchmark-evidence-2026-03-05.md`
+- `tasks/platform/pilot-quality-gate-evidence-2026-03-05.md`

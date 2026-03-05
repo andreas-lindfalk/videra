@@ -2,7 +2,7 @@
 
 ## Active Task
 
-No active task. Last archived: Phase 24 (`tasks/archive/2026-03-05-phase-24-pilot-corpus-benchmark-pack.md`).
+No active task. Last archived: Phase 25 (`tasks/archive/2026-03-05-phase-25-pilot-quality-gate-automation.md`).
 
 ## Definition of Done Template
 
