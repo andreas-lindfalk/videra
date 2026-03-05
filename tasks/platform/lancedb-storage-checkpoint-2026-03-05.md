@@ -4,6 +4,8 @@ Purpose: decide storage direction for the next target state without mixing in fu
 
 Status: Completed
 
+Superseded by: `tasks/platform/storage-decision-recheckpoint-2026-03-05.md` (Phase 29)
+
 ## Decision Goal
 
 Decide whether the next phase should:

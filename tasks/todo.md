@@ -2,7 +2,7 @@
 
 ## Active Task
 
-No active task. Last archived: Phase 25 (`tasks/archive/2026-03-05-phase-25-pilot-quality-gate-automation.md`).
+No active task. Last archived: Phase 29 (`tasks/archive/2026-03-05-phase-29-storage-decision-recheckpoint.md`).
 
 ## Definition of Done Template
 

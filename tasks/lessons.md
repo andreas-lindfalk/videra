@@ -232,3 +232,23 @@
 
 - **Promote repeated validation flows to one-command targets.** Packaging stable integration subsets into a dedicated `make` target reduces execution drift and makes operator handoffs more reliable.
 - **Keep composed gates contract-focused.** Combining benchmark quality checks with ingestion guardrails in one run provides a clearer GO/NO-GO signal without broad, expensive full-suite runs.
+
+## 2026-03-05 — Roadmap Clarity Discipline
+
+- **Keep a living North Star artifact in-repo.** Teams move faster when each phase maps directly to target-state outcomes instead of only to technical tasks.
+- **Track phase purpose and endpoint together.** For each phase, make explicit what capability it adds and which final release criterion it advances.
+
+## 2026-03-05 — Release Decision Signal Coupling
+
+- **Do not treat operational pass/fail as sufficient release proof.** Couple release gates with a compact retrieval-quality signal so GO decisions reflect both reliability and result quality.
+- **Keep quality coupling lightweight and repeatable.** A focused quality command integrated into release evidence is more sustainable than ad-hoc manual quality checks.
+
+## 2026-03-05 — Real-Corpus Promotion Discipline
+
+- **Promotion gates need explicit thresholds and templates.** Defining measurable criteria (`evidenceMatchRate`, `topTwoQualityRate`, deterministic replay, guardrail semantics) prevents subjective rollout calls.
+- **Compose promotion gates from existing proven checks.** Reusing stable focused tests via one command improves repeatability and lowers operational friction.
+
+## 2026-03-05 — Storage Re-checkpoint Discipline
+
+- **Run backend migration decisions through explicit GO criteria.** A weighted matrix plus hard preconditions prevents architecture churn driven by intuition.
+- **Require benchmark and runtime-contract proof before migration.** If performance gains and operational readiness are not both demonstrated, defer migration and preserve the stable path.

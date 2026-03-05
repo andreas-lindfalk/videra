@@ -15,6 +15,7 @@ Related docs:
 - `tasks/platform/final-mvp-handoff-2026-03-04.md`
 - `tasks/platform/rc2-release-execution-checklist-2026-03-05.md`
 - `tasks/platform/rc2-release-evidence-2026-03-05.md`
+- `tasks/platform/pilot-quality-gate-evidence-2026-03-05.md`
 
 ## Required Command Gate
 
@@ -23,6 +24,7 @@ Run from repo root:
 ```bash
 make release-gate
 make release-gate-split
+make pilot-quality-gate
 ```
 
 Optional preflight-only check:
@@ -33,7 +35,7 @@ make release-gate-preflight
 
 Expected outcome:
 
-- Both commands exit with code `0`.
+- All commands exit with code `0`.
 - No MCP contract/tool schema changes are required to pass.
 
 ## What `make release-gate` covers
@@ -51,6 +53,16 @@ Focused split-role release-critical semantics:
 - `TestIndexVideoAsyncSplitRoleRedisSharedStorageVisibility`
 - `TestWorkerRoleWithHTTPTransportFailsFastAtStartup`
 
+## What `make pilot-quality-gate` covers
+
+Focused quality signal for release decisions:
+
+- Pilot benchmark scorecard (`TestDefaultIntegrationSuite/TestPilotBenchmarkScorecard`)
+- Real-mode guardrails:
+	- `TestIndexVideoRealModeRemotePathRespectsMaxSizeBound`
+	- `TestIndexVideoRealModeRemotePathHonorsDisabledFetch`
+	- `TestIndexVideoRealModeRequiresSidecarForLocalPath`
+
 ## Release Evidence Template
 
 ```text
@@ -61,6 +73,13 @@ Operator: <name>
 Command Results:
 - make release-gate: pass/fail
 - make release-gate-split: pass/fail
+- make pilot-quality-gate: pass/fail
+
+Quality Signal:
+- pilot benchmark scorecard log captured: pass/fail
+- evidenceMatchRate: <value>
+- deterministicRate: <value>
+- topTwoQualityRate: <value>
 
 Contract Checks:
 - index_video / get_index_job compatibility: pass/fail
@@ -82,9 +101,9 @@ Go/No-Go:
 
 ## Decision Policy
 
-- **GO** when both gate commands pass and there are no unresolved contract regressions.
-- **NO-GO** when any gate command fails or parity/split-role checks are ambiguous.
-- If **NO-GO**, document mitigation and rerun both commands before re-evaluation.
+- **GO** when all three commands pass and there are no unresolved contract regressions.
+- **NO-GO** when any gate command fails or parity/split-role/quality checks are ambiguous.
+- If **NO-GO**, document mitigation and rerun the full command set before re-evaluation.
 
 ## Troubleshooting and Rerun Discipline (RC1 Stabilization)
 
@@ -95,6 +114,7 @@ make release-gate-preflight
 make release-gate-clean
 make release-gate
 make release-gate-split
+make pilot-quality-gate
 ```
 
 Notes:

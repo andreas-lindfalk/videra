@@ -61,3 +61,20 @@ If NO-GO:
 
 - [ ] Document blocker and mitigation path.
 - [ ] Re-run canonical command sequence after mitigation.
+
+## 6) Phase 27 Add-on (Release + Quality Signal Coupling)
+
+For all new RC-style runs after Phase 27, include this additional required step:
+
+```bash
+make pilot-quality-gate
+```
+
+Required evidence additions:
+
+- [ ] Record `make pilot-quality-gate` outcome in release evidence.
+- [ ] Capture pilot scorecard metrics from logs:
+  - [ ] `evidenceMatchRate`
+  - [ ] `deterministicRate`
+  - [ ] `topTwoQualityRate`
+- [ ] Treat release decision as NO-GO if pilot quality gate fails.

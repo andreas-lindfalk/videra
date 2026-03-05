@@ -2,6 +2,19 @@
 
 Privacy-native multimodal video memory MCP server in Go.
 
+## Roadmap & End-State (Why phases exist)
+
+If you want the short answer to "where this is heading," start here:
+
+- `tasks/platform/roadmap-end-state-2026-03-05.md`
+
+This artifact explains:
+
+- target state (North Star),
+- what "done" means,
+- why completed phases were executed,
+- and what the next phases are expected to deliver.
+
 ## Current MVP Status
 
 - The local MCP flow is working end-to-end (`index_video`, `search_video`, `list_videos`, transcript resource).
@@ -123,6 +136,7 @@ Practical flow:
 - Integration tests: `make integration-test`
 - Integration tests (fresh run): `make integration-test-fresh`
 - Pilot quality gate (benchmark + real-mode guardrails): `make pilot-quality-gate`
+- Real-corpus promotion gate: `make real-corpus-promotion-gate`
 - MVP release gate (full): `make release-gate`
 - MVP split-role critical checks: `make release-gate-split`
 - MVP release gate preflight: `make release-gate-preflight`
@@ -282,3 +296,16 @@ Related phase artifacts:
 
 - `tasks/platform/pilot-corpus-benchmark-evidence-2026-03-05.md`
 - `tasks/platform/pilot-quality-gate-evidence-2026-03-05.md`
+
+## Real Corpus Promotion Gate (Phase 28)
+
+Promotion-focused command (quality + determinism + contract checks):
+
+```bash
+make real-corpus-promotion-gate
+```
+
+Related artifacts:
+
+- `tasks/platform/real-corpus-promotion-gate-2026-03-05.md`
+- `tasks/platform/real-corpus-promotion-evidence-template.md`

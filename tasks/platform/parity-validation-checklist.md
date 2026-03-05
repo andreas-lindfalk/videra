@@ -119,6 +119,7 @@ Before final MVP go/no-go, also run:
 ```bash
 make release-gate
 make release-gate-split
+make pilot-quality-gate
 ```
 
 Pass criteria:
@@ -126,6 +127,7 @@ Pass criteria:
 - Split-role lifecycle semantics pass (`pending -> completed|failed`) with explicit retry-exhausted failure behavior.
 - Shared-storage split-role visibility path is proven (`list_videos` / `search_video` after async completion).
 - Worker-role transport guardrail is proven (`VIDERA_JOBQUEUE_ROLE=worker` rejects HTTP transport).
+- Pilot benchmark quality signal and real-mode guardrails are green in the same release cycle.
 
 If local Docker pressure causes unstable gate execution, use:
 
@@ -134,4 +136,5 @@ make release-gate-preflight
 make release-gate-clean
 make release-gate
 make release-gate-split
+make pilot-quality-gate
 ```
