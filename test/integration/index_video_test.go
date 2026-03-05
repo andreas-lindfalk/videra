@@ -600,6 +600,68 @@ func (s *defaultIntegrationSuite) TestProofPackProductRecallPrioritizesTop2Evide
 	require.Contains(t, topTwo, "discussion")
 }
 
+func (s *defaultIntegrationSuite) TestPilotBenchmarkScorecard() {
+	t := s.T()
+	ctx := s.ctx
+	cli := s.cli
+
+	scenarios, err := proofpack.LoadPilotBenchmarkScenarios()
+	require.NoError(t, err)
+	require.NotEmpty(t, scenarios)
+
+	evidenceExpectedTotal := 0
+	evidenceMatchedTotal := 0
+	deterministicCount := 0
+	topTwoQualityCount := 0
+
+	for _, scenario := range scenarios {
+		scenario := scenario
+		s.Run(scenario.Name, func() {
+			resetIndex(t, ctx, cli)
+
+			indexResult, indexErr := cli.CallTool(ctx, mcp.CallToolRequest{
+				Params: mcp.CallToolParams{
+					Name: "index_video",
+					Arguments: map[string]any{
+						"path": scenario.VideoPath,
+					},
+				},
+			})
+			require.NoError(t, indexErr)
+			require.False(t, indexResult.IsError)
+
+			firstResults := searchAndExtractResults(t, ctx, cli, scenario.Query, 5)
+			secondResults := searchAndExtractResults(t, ctx, cli, scenario.Query, 5)
+
+			require.Equal(t, firstResults, secondResults)
+			require.GreaterOrEqual(t, len(firstResults), scenario.MinResults)
+
+			matched := evidenceMatches(firstResults, scenario.ExpectedEvidence)
+			require.GreaterOrEqual(t, matched, len(scenario.ExpectedEvidence))
+
+			topLimit := minInt(2, len(firstResults))
+			topTwoMatched := evidenceMatches(firstResults[:topLimit], scenario.ExpectedEvidence)
+			require.Greater(t, topTwoMatched, 0)
+
+			evidenceExpectedTotal += len(scenario.ExpectedEvidence)
+			evidenceMatchedTotal += matched
+			deterministicCount++
+			topTwoQualityCount++
+		})
+	}
+
+	require.Greater(t, evidenceExpectedTotal, 0)
+	evidenceMatchRate := float64(evidenceMatchedTotal) / float64(evidenceExpectedTotal)
+	deterministicRate := float64(deterministicCount) / float64(len(scenarios))
+	topTwoQualityRate := float64(topTwoQualityCount) / float64(len(scenarios))
+
+	require.GreaterOrEqual(t, evidenceMatchRate, 1.0)
+	require.GreaterOrEqual(t, deterministicRate, 1.0)
+	require.GreaterOrEqual(t, topTwoQualityRate, 1.0)
+
+	t.Logf("pilot benchmark scorecard: scenarios=%d evidenceMatchRate=%.2f deterministicRate=%.2f topTwoQualityRate=%.2f", len(scenarios), evidenceMatchRate, deterministicRate, topTwoQualityRate)
+}
+
 func (s *defaultIntegrationSuite) TestSearchVideoIncludeDebugMetadata() {
 	t := s.T()
 	ctx := s.ctx
@@ -886,6 +948,13 @@ func topScoreForType(results []map[string]any, segmentType string) float64 {
 		}
 	}
 	return max
+}
+
+func minInt(left, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func evidenceMatches(results []map[string]any, expected []string) int {

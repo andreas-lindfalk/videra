@@ -35,6 +35,20 @@ func TestLoadDomainProfileScenariosFixture(t *testing.T) {
 	}
 }
 
+func TestLoadPilotBenchmarkScenariosFixture(t *testing.T) {
+	scenarios, err := LoadPilotBenchmarkScenarios()
+	require.NoError(t, err)
+	require.Len(t, scenarios, 6)
+
+	for _, scenario := range scenarios {
+		require.NotEmpty(t, scenario.Name)
+		require.NotEmpty(t, scenario.VideoPath)
+		require.NotEmpty(t, scenario.Query)
+		require.NotEmpty(t, scenario.ExpectedEvidence)
+		require.Greater(t, scenario.MinResults, 0)
+	}
+}
+
 func TestRunScenarioDeterministicReplay(t *testing.T) {
 	scenario := Scenario{
 		Name:             "deterministic",

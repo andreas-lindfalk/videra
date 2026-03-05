@@ -222,3 +222,8 @@
 
 - **Treat real-mode source constraints as first-class quality gates.** Disabled remote fetch, sidecar requirements, and max-size bounds should have explicit integration assertions and stable error semantics.
 - **Pair real-mode guardrails with deterministic/evidence checks.** Corpus onboarding is only release-ready when ingestion constraints and retrieval quality signals are both green.
+
+## 2026-03-05 — Pilot Benchmark Scorecard Discipline
+
+- **Keep pilot benchmark packs fixture-driven and measurable.** A small curated scenario slice with explicit evidence targets provides faster and more reliable tuning feedback than ad-hoc query checks.
+- **Gate tuning changes on metric thresholds, not intuition.** Preserve neutral defaults unless benchmark scorecards show concrete degradation signals that justify domain-specific mapping.

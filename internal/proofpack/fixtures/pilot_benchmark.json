@@ -1,0 +1,44 @@
+[
+  {
+    "name": "pilot_engineering_planning",
+    "videoPath": "https://example.com/pilot-engineering-sync.mp4",
+    "query": "roadmap budget next actions",
+    "expectedEvidence": ["roadmap", "budget", "next actions"],
+    "minResults": 3
+  },
+  {
+    "name": "pilot_legal_closeout",
+    "videoPath": "https://example.com/pilot-legal-review.mp4",
+    "query": "closing remarks and next actions",
+    "expectedEvidence": ["closing remarks", "next actions"],
+    "minResults": 2
+  },
+  {
+    "name": "pilot_product_recall",
+    "videoPath": "https://example.com/pilot-product-interview.mp4",
+    "query": "intro segment discussion",
+    "expectedEvidence": ["intro segment", "discussion"],
+    "minResults": 2
+  },
+  {
+    "name": "pilot_animals_intro",
+    "videoPath": "https://example.com/pilot-cats-daily.mp4",
+    "query": "pilot cats daily intro segment",
+    "expectedEvidence": ["pilot-cats-daily", "intro segment"],
+    "minResults": 2
+  },
+  {
+    "name": "pilot_finance_review",
+    "videoPath": "https://example.com/pilot-finance-checkin.mp4",
+    "query": "main discussion roadmap budget",
+    "expectedEvidence": ["main discussion", "roadmap", "budget"],
+    "minResults": 3
+  },
+  {
+    "name": "pilot_support_handoff",
+    "videoPath": "https://example.com/pilot-support-handoff.mp4",
+    "query": "closing remarks next actions",
+    "expectedEvidence": ["closing remarks", "next actions"],
+    "minResults": 2
+  }
+]

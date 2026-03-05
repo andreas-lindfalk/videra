@@ -20,6 +20,9 @@ var scenariosFixture []byte
 //go:embed fixtures/domain_profiles.json
 var domainProfilesFixture []byte
 
+//go:embed fixtures/pilot_benchmark.json
+var pilotBenchmarkFixture []byte
+
 func LoadScenarios() ([]Scenario, error) {
 	var scenarios []Scenario
 	if err := json.Unmarshal(scenariosFixture, &scenarios); err != nil {
@@ -32,6 +35,14 @@ func LoadDomainProfileScenarios() ([]Scenario, error) {
 	var scenarios []Scenario
 	if err := json.Unmarshal(domainProfilesFixture, &scenarios); err != nil {
 		return nil, fmt.Errorf("decode domain profile scenarios fixture: %w", err)
+	}
+	return scenarios, nil
+}
+
+func LoadPilotBenchmarkScenarios() ([]Scenario, error) {
+	var scenarios []Scenario
+	if err := json.Unmarshal(pilotBenchmarkFixture, &scenarios); err != nil {
+		return nil, fmt.Errorf("decode pilot benchmark scenarios fixture: %w", err)
 	}
 	return scenarios, nil
 }

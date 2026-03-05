@@ -2,7 +2,7 @@
 
 ## Active Task
 
-No active task. Add a new phase plan here before implementation.
+No active task. Last archived: Phase 24 (`tasks/archive/2026-03-05-phase-24-pilot-corpus-benchmark-pack.md`).
 
 ## Definition of Done Template
 
