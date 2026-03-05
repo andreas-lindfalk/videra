@@ -197,3 +197,8 @@
 - **Fresh integration runs expose real instability sooner.** Using `-count=1` in release-gate integration checks avoids cached false confidence.
 - **Testcontainers deadline control should be explicit for containerized suites.** `WithWaitStrategyAndDeadline(...)` with a bounded startup window reduces intermittent `context deadline exceeded` failures in slow local environments.
 - **Stabilization should pair code-level hardening with operator rerun discipline.** Preflight/cleanup + deterministic rerun steps prevent ambiguous release outcomes.
+
+## 2026-03-05 — RC2 Release Packaging Discipline
+
+- **Capture release evidence from command outputs + exit codes together.** Storing deterministic gate logs and explicit exit status per command makes RC go/no-go decisions auditable instead of narrative.
+- **Keep split-role checks as a first-class gate artifact.** Recording focused split-role pass results alongside full release-gate output preserves control-plane/data-plane confidence for operators.

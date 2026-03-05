@@ -13,6 +13,8 @@ Related docs:
 - `tasks/platform/rc1-stabilization-evidence-2026-03-04.md`
 - `tasks/platform/post-mvp-backlog-cut-2026-03-04.md`
 - `tasks/platform/final-mvp-handoff-2026-03-04.md`
+- `tasks/platform/rc2-release-execution-checklist-2026-03-05.md`
+- `tasks/platform/rc2-release-evidence-2026-03-05.md`
 
 ## Required Command Gate
 
@@ -38,7 +40,7 @@ Expected outcome:
 
 - `make build`
 - `make test`
-- `make integration-test`
+- `make integration-test-fresh`
 - `make docker-build`
 
 ## What `make release-gate-split` covers

@@ -40,6 +40,8 @@ make release-gate-split
 - Release gate definition: `tasks/platform/mvp-release-gate.md`
 - MVP gate evidence (Phase 16): `tasks/platform/mvp-release-gate-evidence-2026-03-04.md`
 - RC1 stabilization evidence (Phase 17): `tasks/platform/rc1-stabilization-evidence-2026-03-04.md`
+- RC2 execution checklist (Phase 18): `tasks/platform/rc2-release-execution-checklist-2026-03-05.md`
+- RC2 release evidence (Phase 18): `tasks/platform/rc2-release-evidence-2026-03-05.md`
 - Deployment parity checklist: `tasks/platform/parity-validation-checklist.md`
 - Env/runtime contract: `tasks/platform/env-contract.md`
 
@@ -51,6 +53,17 @@ make release-gate-split
 Guardrail:
 
 - Do not pull deferred items into release stabilization unless they become explicit release blockers.
+
+## Concise Release Notes
+
+Known limits:
+
+- Real-environment cloud parity evidence capture remains an operational follow-up outside local RC execution.
+- Extended stress/SLO validation is deferred to post-MVP hardening scope.
+
+Deferred items source of truth:
+
+- `tasks/platform/post-mvp-backlog-cut-2026-03-04.md`
 
 ## Suggested Next Operational Step
 

@@ -161,6 +161,7 @@ make release-gate-split
 3. Record evidence using:
 
 - `tasks/platform/mvp-release-gate.md`
+- `tasks/platform/rc2-release-execution-checklist-2026-03-05.md`
 - `tasks/platform/parity-validation-checklist.md`
 
 ## Copilot / MCP Client Setup Notes
