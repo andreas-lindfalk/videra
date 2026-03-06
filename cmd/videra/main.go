@@ -36,7 +36,7 @@ func run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	runtimeCaps := ingestion.DetectRuntimeCapabilities()
+	runtimeCaps := ingestion.DetectRuntimeCapabilities(cfg.CLIPORTLibraryPath)
 	log.Printf("runtime capabilities: %s", runtimeCaps.Summary())
 	if cfg.IngestionMode == config.IngestionModeReal {
 		if !runtimeCaps.WhisperFallbackAvailable() {
@@ -44,6 +44,9 @@ func run() error {
 		}
 		if !runtimeCaps.Tesseract {
 			log.Printf("info: tesseract not found; visual OCR enhancement is disabled")
+		}
+		if cfg.VisualBackend == "clip" && !runtimeCaps.CLIPVisualAvailable() {
+			log.Printf("warning: clip visual backend is configured but native onnxruntime shared library is unavailable (VIDERA_CLIP_ORT_LIB_PATH=%s); real mode will fall back to ocr visual embedding", cfg.CLIPORTLibraryPath)
 		}
 	}
 
@@ -79,6 +82,10 @@ func run() error {
 		RemoteFetchDisabled:   !cfg.RemoteFetchEnabled,
 		RemoteFetchTimeoutSec: cfg.RemoteFetchTimeout,
 		RemoteFetchMaxMB:      cfg.RemoteFetchMaxMB,
+		VisualBackend:         cfg.VisualBackend,
+		CLIPModelPath:         cfg.CLIPModelPath,
+		CLIPORTLibraryPath:    cfg.CLIPORTLibraryPath,
+		CLIPInputSize:         cfg.CLIPInputSize,
 	}
 
 	var ingester ingestion.Ingester

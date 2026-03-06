@@ -15,6 +15,7 @@ import (
 type fakeFFmpegRunner struct {
 	extractAudioCalls int
 	extractAudioErr   error
+	extractFrameErr   error
 }
 
 func (f *fakeFFmpegRunner) ExtractAudio(_ context.Context, _ string, outputPath string) error {
@@ -26,6 +27,9 @@ func (f *fakeFFmpegRunner) ExtractAudio(_ context.Context, _ string, outputPath 
 }
 
 func (f *fakeFFmpegRunner) ExtractKeyframes(_ context.Context, _ string, _ string, _ int) error {
+	if f.extractFrameErr != nil {
+		return f.extractFrameErr
+	}
 	return nil
 }
 
@@ -121,13 +125,32 @@ func TestRealIngesterIndexesPlainTextSidecar(t *testing.T) {
 	video, err := ingester.IndexVideo(context.Background(), videoPath)
 	require.NoError(t, err)
 	require.Equal(t, 3, video.AudioSegments)
-	require.GreaterOrEqual(t, video.VisualSegments, 1)
+	require.Equal(t, 0, video.VisualSegments)
+	require.Equal(t, []string{"audio"}, video.Modalities)
 
 	transcript, err := store.GetTranscript(context.Background(), video.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, transcript)
 	require.Equal(t, "hello team", transcript[0].Text)
 	require.NotContains(t, transcript[0].Text, "[simulated]")
+}
+
+func TestRealIngesterSkipsVisualSegmentsWhenKeyframeExtractionFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	videoPath := filepath.Join(tmpDir, "meeting.mp4")
+	require.NoError(t, createFile(videoPath, "placeholder"))
+	require.NoError(t, createFile(filepath.Join(tmpDir, "meeting.txt"), "hello team\nbudget roadmap"))
+
+	store, err := storage.NewChromemStore(filepath.Join(tmpDir, "data"), embedding.NewDeterministicTextEmbedder())
+	require.NoError(t, err)
+
+	ffmpeg := &fakeFFmpegRunner{extractFrameErr: os.ErrPermission}
+	ingester := NewRealIngesterWithDeps(store, IndexOptions{FrameIntervalSec: 5, Concurrency: 1}, ffmpeg, &fakeTranscriber{}, &cueVisualEmbedder{})
+
+	video, err := ingester.IndexVideo(context.Background(), videoPath)
+	require.NoError(t, err)
+	require.Equal(t, 0, video.VisualSegments)
+	require.Equal(t, []string{"audio"}, video.Modalities)
 }
 
 func TestRealIngesterFallsBackToAudioTranscriptionWhenNoSidecar(t *testing.T) {
@@ -273,6 +296,18 @@ func TestRealIngesterVisualCueQueryReturnsVisualHit(t *testing.T) {
 		}
 	}
 	require.True(t, foundVisual)
+}
+
+func TestResolveDefaultVisualEmbedderFallsBackToOCRWhenCLIPUnavailable(t *testing.T) {
+	embedder := resolveDefaultVisualEmbedder(IndexOptions{
+		VisualBackend:      "clip",
+		CLIPModelPath:      "/missing/clip.onnx",
+		CLIPORTLibraryPath: "/missing/libonnxruntime.so",
+		CLIPInputSize:      224,
+	})
+
+	_, ok := embedder.(*OCRVisualEmbedder)
+	require.True(t, ok)
 }
 
 type fakeFFmpegRunnerWithFrames struct{}

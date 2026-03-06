@@ -62,6 +62,10 @@ type Config struct {
 	IndexConcurrency      int
 	SearchAudioWeight     float64
 	SearchVisualWeight    float64
+	VisualBackend         string
+	CLIPModelPath         string
+	CLIPORTLibraryPath    string
+	CLIPInputSize         int
 	SemanticCanonicalMap  map[string]string
 	JobQueueBackend       JobQueueBackend
 	JobQueueRole          JobQueueRole
@@ -103,6 +107,10 @@ func Load() (Config, error) {
 		IndexConcurrency:      4,
 		SearchAudioWeight:     1.0,
 		SearchVisualWeight:    1.0,
+		VisualBackend:         "ocr",
+		CLIPModelPath:         "",
+		CLIPORTLibraryPath:    "/usr/local/lib/libonnxruntime.so",
+		CLIPInputSize:         224,
 		SemanticCanonicalMap:  map[string]string{},
 		JobQueueBackend:       JobQueueBackendInProcess,
 		JobQueueRole:          JobQueueRoleAll,
@@ -198,6 +206,20 @@ func Load() (Config, error) {
 	if value, ok := os.LookupEnv("VIDERA_SEARCH_VISUAL_WEIGHT"); ok {
 		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%f", &cfg.SearchVisualWeight); err != nil {
 			return Config{}, fmt.Errorf("invalid VIDERA_SEARCH_VISUAL_WEIGHT: %w", err)
+		}
+	}
+	if value, ok := os.LookupEnv("VIDERA_VISUAL_BACKEND"); ok {
+		cfg.VisualBackend = strings.ToLower(strings.TrimSpace(value))
+	}
+	if value, ok := os.LookupEnv("VIDERA_CLIP_MODEL_PATH"); ok {
+		cfg.CLIPModelPath = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_CLIP_ORT_LIB_PATH"); ok {
+		cfg.CLIPORTLibraryPath = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_CLIP_INPUT_SIZE"); ok {
+		if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &cfg.CLIPInputSize); err != nil {
+			return Config{}, fmt.Errorf("invalid VIDERA_CLIP_INPUT_SIZE: %w", err)
 		}
 	}
 	if value, ok := os.LookupEnv("VIDERA_SEMANTIC_CANONICAL_MAP"); ok {
@@ -319,6 +341,18 @@ func Load() (Config, error) {
 	}
 	if cfg.SearchVisualWeight <= 0 {
 		return Config{}, fmt.Errorf("VIDERA_SEARCH_VISUAL_WEIGHT must be > 0")
+	}
+	if cfg.VisualBackend != "ocr" && cfg.VisualBackend != "clip" {
+		return Config{}, fmt.Errorf("unsupported VIDERA_VISUAL_BACKEND: %s", cfg.VisualBackend)
+	}
+	if cfg.VisualBackend == "clip" && cfg.CLIPModelPath == "" {
+		return Config{}, fmt.Errorf("VIDERA_CLIP_MODEL_PATH cannot be empty when VIDERA_VISUAL_BACKEND=clip")
+	}
+	if cfg.VisualBackend == "clip" && cfg.CLIPORTLibraryPath == "" {
+		return Config{}, fmt.Errorf("VIDERA_CLIP_ORT_LIB_PATH cannot be empty when VIDERA_VISUAL_BACKEND=clip")
+	}
+	if cfg.CLIPInputSize <= 0 {
+		return Config{}, fmt.Errorf("VIDERA_CLIP_INPUT_SIZE must be > 0")
 	}
 	if cfg.JobQueueBackend != JobQueueBackendInProcess && cfg.JobQueueBackend != JobQueueBackendNATS && cfg.JobQueueBackend != JobQueueBackendRedis {
 		return Config{}, fmt.Errorf("unsupported VIDERA_JOBQUEUE_BACKEND: %s", cfg.JobQueueBackend)

@@ -132,7 +132,7 @@ func (i *MockIngester) buildVisualSegments(ctx context.Context, videoID, path st
 			"remote/frame-00002.jpg",
 			"remote/frame-00003.jpg",
 		}
-		return BuildVisualSegments(videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
+		return BuildVisualSegments(ctx, videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "videra-frames-*")
@@ -147,7 +147,7 @@ func (i *MockIngester) buildVisualSegments(ctx context.Context, videoID, path st
 			filepath.Join(tmpDir, "frame-fallback-00001.jpg"),
 			filepath.Join(tmpDir, "frame-fallback-00002.jpg"),
 		}
-		return BuildVisualSegments(videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
+		return BuildVisualSegments(ctx, videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
 	}
 
 	entries, err := os.ReadDir(tmpDir)
@@ -170,7 +170,7 @@ func (i *MockIngester) buildVisualSegments(ctx context.Context, videoID, path st
 		framePaths = []string{filepath.Join(tmpDir, "frame-empty-00001.jpg")}
 	}
 
-	return BuildVisualSegments(videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
+	return BuildVisualSegments(ctx, videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
 }
 
 func countSegmentsByType(segments []storage.Segment, segmentType storage.SegmentType) int {

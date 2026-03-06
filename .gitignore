@@ -39,6 +39,10 @@ videos/*
 data/*
 !data/.gitkeep
 
+# Local model artifacts (do not commit)
+models/*
+!models/.gitkeep
+
 # Native LanceDB SDK artifacts (generated locally)
 /lib/
 /include/lancedb.h

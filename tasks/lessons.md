@@ -1,5 +1,10 @@
 # Lessons Learned
 
+## 2026-03-06 — LanceDB Native Docker Linking Compatibility
+
+- **LanceDB native archives can require newer glibc symbols than Debian bookworm provides.** `liblancedb_go.a` referenced `__isoc23_*` symbols and failed to link in `golang:1.25-bookworm`; switching LanceDB-native build/runtime stages to Debian 13-compatible bases resolved the linker/runtime ABI mismatch.
+- **Separate apt TLS bootstrap from cert installation in minimal Debian runtime stages.** On `debian:13-slim`, forcing HTTPS apt sources before installing `ca-certificates` can fail certificate verification; run initial `apt-get update/install` on default sources first, then rely on installed certs.
+
 ## 2026-03-04 — Project Bootstrap
 
 - **LanceDB Go SDK exists (`github.com/lancedb/lancedb-go`) but has native packaging requirements.** It requires CGO plus platform-specific native artifacts (`include/lancedb.h` + linked libs), so a repo can still choose `chromem-go` as the default zero-dependency baseline.
@@ -258,6 +263,11 @@
 - **Run backend migration decisions through explicit GO criteria.** A weighted matrix plus hard preconditions prevents architecture churn driven by intuition.
 - **Require benchmark and runtime-contract proof before migration.** If performance gains and operational readiness are not both demonstrated, defer migration and preserve the stable path.
 
+## 2026-03-06 — CLIP Runtime Fallback Discipline
+
+- **Treat CLIP visual backend as capability-gated at startup, not as an implicit runtime surprise.** Detect native ONNX Runtime shared-library readiness and emit explicit warnings when configured dependencies are incomplete.
+- **Keep real-mode visual behavior deterministic under failure.** When CLIP backend setup fails, fallback to OCR explicitly rather than fabricating simulated visual placeholders.
+
 ## 2026-03-05 — Promotion Workflow Consolidation
 
 - **One-command operator flows reduce decision drift.** Wrapping release, split-role, and promotion gates into a single command improves repeatability and handoff quality.
@@ -307,3 +317,17 @@
 
 - **Validate new helper commands immediately with formatting + compile checks.** Running `gofmt` and a focused `go test ./cmd/<tool>` right after adding a new local CLI catches malformed files before downstream edits compound the failure.
 - **Prefer simple line-oriented shell loops over heredoc-heavy Make recipes.** Complex heredoc blocks are fragile in tab-indented Make targets and can produce hard-to-read parser errors (`missing separator`).
+
+## 2026-03-06 — Real Visual Fallback Discipline
+
+- **Real mode should never fabricate visual evidence.** When keyframe extraction or OCR capability is unavailable, skip visual segments instead of returning simulated placeholder context.
+- **Keep simulation scoped to simulated mode only.** Stub visual embedders are acceptable for mock/test pipelines but should not be the default path in real ingestion.
+
+## 2026-03-06 — CLIP Runtime Degradation Safety
+
+- **Initialization fallback is not enough; inference-time fallback matters too.** A CLIP backend can initialize successfully but still fail per-frame (bad model/runtime); fall back to OCR at embed time to avoid silently dropping visual coverage.
+
+## 2026-03-06 — ONNX Runtime Compatibility Discipline
+
+- **`onnxruntime_go` version and runtime shared-library version must be pinned together.** Mismatched combinations fail at startup with API-version incompatibility errors even when the model path and library path are correct.
+- **Visual CLIP smoke requires keyframe extraction availability (`ffmpeg=true`) to validate the visual path.** ONNX readiness alone is insufficient because no keyframes means no visual segments are produced.

@@ -45,6 +45,9 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.Equal(t, 250, cfg.JobQueueRetryBackoff)
 	require.Equal(t, 250, cfg.JobQueueWorkerPollMS)
 	require.False(t, cfg.SplitSharedStorage)
+	require.Equal(t, "ocr", cfg.VisualBackend)
+	require.Equal(t, "/usr/local/lib/libonnxruntime.so", cfg.CLIPORTLibraryPath)
+	require.Equal(t, 224, cfg.CLIPInputSize)
 }
 
 func TestLoadDefaultsToLanceDBBackend(t *testing.T) {
@@ -209,6 +212,55 @@ func TestLoadInvalidSemanticCanonicalMapFails(t *testing.T) {
 	_, err := Load()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid VIDERA_SEMANTIC_CANONICAL_MAP")
+}
+
+func TestLoadParsesCLIPVisualBackend(t *testing.T) {
+	t.Setenv("VIDERA_VISUAL_BACKEND", "clip")
+	t.Setenv("VIDERA_CLIP_MODEL_PATH", "models/clip-vit-b32.onnx")
+	t.Setenv("VIDERA_CLIP_ORT_LIB_PATH", "/opt/onnxruntime/lib/libonnxruntime.so")
+	t.Setenv("VIDERA_CLIP_INPUT_SIZE", "336")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "clip", cfg.VisualBackend)
+	require.Equal(t, "models/clip-vit-b32.onnx", cfg.CLIPModelPath)
+	require.Equal(t, "/opt/onnxruntime/lib/libonnxruntime.so", cfg.CLIPORTLibraryPath)
+	require.Equal(t, 336, cfg.CLIPInputSize)
+}
+
+func TestLoadInvalidVisualBackendFails(t *testing.T) {
+	t.Setenv("VIDERA_VISUAL_BACKEND", "resnet")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported VIDERA_VISUAL_BACKEND")
+}
+
+func TestLoadCLIPBackendRequiresModelPath(t *testing.T) {
+	t.Setenv("VIDERA_VISUAL_BACKEND", "clip")
+	t.Setenv("VIDERA_CLIP_MODEL_PATH", "")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "VIDERA_CLIP_MODEL_PATH cannot be empty")
+}
+
+func TestLoadCLIPBackendRequiresORTLibraryPath(t *testing.T) {
+	t.Setenv("VIDERA_VISUAL_BACKEND", "clip")
+	t.Setenv("VIDERA_CLIP_MODEL_PATH", "models/clip-vit-b32.onnx")
+	t.Setenv("VIDERA_CLIP_ORT_LIB_PATH", "")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "VIDERA_CLIP_ORT_LIB_PATH cannot be empty")
+}
+
+func TestLoadInvalidCLIPInputSizeFails(t *testing.T) {
+	t.Setenv("VIDERA_CLIP_INPUT_SIZE", "0")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "VIDERA_CLIP_INPUT_SIZE must be > 0")
 }
 
 func TestLoadInvalidSplitSharedStorageFlagFails(t *testing.T) {

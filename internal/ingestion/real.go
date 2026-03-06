@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andreas-lindfalk/videra/internal/embedding"
 	"github.com/andreas-lindfalk/videra/internal/storage"
 	"github.com/google/uuid"
 )
@@ -28,7 +30,7 @@ type RealIngester struct {
 }
 
 func NewRealIngester(store storage.VectorStore, options IndexOptions) *RealIngester {
-	return NewRealIngesterWithDeps(store, options, ExecFFmpeg{}, NewWhisperCLITranscriber(), NewOCRVisualEmbedder(NewStubCLIPEmbedder()))
+	return NewRealIngesterWithDeps(store, options, ExecFFmpeg{}, NewWhisperCLITranscriber(), nil)
 }
 
 func NewRealIngesterWithDeps(store storage.VectorStore, options IndexOptions, ffmpeg FFmpegRunner, transcriber Transcriber, visualEmbedder VisualEmbedder) *RealIngester {
@@ -48,6 +50,15 @@ func NewRealIngesterWithAllDeps(store storage.VectorStore, options IndexOptions,
 	if options.RemoteFetchMaxMB <= 0 {
 		options.RemoteFetchMaxMB = 200
 	}
+	if strings.TrimSpace(options.VisualBackend) == "" {
+		options.VisualBackend = "ocr"
+	}
+	if strings.TrimSpace(options.CLIPORTLibraryPath) == "" {
+		options.CLIPORTLibraryPath = DefaultCLIPORTLibraryPath
+	}
+	if options.CLIPInputSize <= 0 {
+		options.CLIPInputSize = 224
+	}
 	if ffmpeg == nil {
 		ffmpeg = ExecFFmpeg{}
 	}
@@ -62,7 +73,7 @@ func NewRealIngesterWithAllDeps(store storage.VectorStore, options IndexOptions,
 		})
 	}
 	if visualEmbedder == nil {
-		visualEmbedder = NewOCRVisualEmbedder(NewStubCLIPEmbedder())
+		visualEmbedder = resolveDefaultVisualEmbedder(options)
 	}
 
 	return &RealIngester{
@@ -73,6 +84,24 @@ func NewRealIngesterWithAllDeps(store storage.VectorStore, options IndexOptions,
 		visualEmbedder: visualEmbedder,
 		options:        options,
 	}
+}
+
+func resolveDefaultVisualEmbedder(options IndexOptions) VisualEmbedder {
+	backend := strings.ToLower(strings.TrimSpace(options.VisualBackend))
+	if backend == "clip" {
+		embedder, err := NewCLIPVisualEmbedder(CLIPVisualEmbedderOptions{
+			ModelPath:      options.CLIPModelPath,
+			ORTLibraryPath: options.CLIPORTLibraryPath,
+			InputSize:      options.CLIPInputSize,
+		})
+		if err != nil {
+			log.Printf("warning: clip visual backend unavailable (%v); falling back to ocr", err)
+			return NewOCRVisualEmbedder(nil)
+		}
+		return NewFailoverVisualEmbedder(embedder, NewOCRVisualEmbedder(nil))
+	}
+
+	return NewOCRVisualEmbedder(nil)
 }
 
 func (i *RealIngester) IndexVideo(ctx context.Context, path string) (storage.Video, error) {
@@ -160,11 +189,7 @@ func (i *RealIngester) buildVisualSegments(ctx context.Context, videoID, path st
 
 	err = i.ffmpeg.ExtractKeyframes(ctx, path, tmpDir, i.options.FrameIntervalSec)
 	if err != nil {
-		framePaths := []string{
-			filepath.Join(tmpDir, "frame-fallback-00001.jpg"),
-			filepath.Join(tmpDir, "frame-fallback-00002.jpg"),
-		}
-		return BuildVisualSegments(videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
+		return nil
 	}
 
 	entries, err := os.ReadDir(tmpDir)
@@ -183,11 +208,11 @@ func (i *RealIngester) buildVisualSegments(ctx context.Context, videoID, path st
 		}
 	}
 	if len(framePaths) == 0 {
-		framePaths = []string{filepath.Join(tmpDir, "frame-empty-00001.jpg")}
+		return nil
 	}
 	sort.Strings(framePaths)
 
-	return BuildVisualSegments(videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
+	return BuildVisualSegments(ctx, videoID, framePaths, i.options.FrameIntervalSec, i.visualEmbedder)
 }
 
 func (i *RealIngester) loadAudioSegments(ctx context.Context, videoPath string) ([]storage.Segment, error) {
@@ -410,14 +435,14 @@ func inferDurationMs(segments []storage.Segment) int64 {
 }
 
 type OCRVisualEmbedder struct {
-	fallback VisualEmbedder
+	textEmbedder embedding.TextEmbedder
 }
 
-func NewOCRVisualEmbedder(fallback VisualEmbedder) *OCRVisualEmbedder {
-	if fallback == nil {
-		fallback = NewStubCLIPEmbedder()
+func NewOCRVisualEmbedder(textEmbedder embedding.TextEmbedder) *OCRVisualEmbedder {
+	if textEmbedder == nil {
+		textEmbedder = embedding.NewDeterministicTextEmbedder()
 	}
-	return &OCRVisualEmbedder{fallback: fallback}
+	return &OCRVisualEmbedder{textEmbedder: textEmbedder}
 }
 
 func (e *OCRVisualEmbedder) EmbedFrame(ctx context.Context, framePath string) ([]float32, string, error) {
@@ -425,30 +450,29 @@ func (e *OCRVisualEmbedder) EmbedFrame(ctx context.Context, framePath string) ([
 		return nil, "", fmt.Errorf("frame path is required")
 	}
 
-	embedding, _, err := e.fallback.EmbedFrame(ctx, framePath)
-	if err != nil {
-		return nil, "", err
-	}
-
-	description := fmt.Sprintf("keyframe from %s", filepath.Base(framePath))
 	if _, err := exec.LookPath("tesseract"); err != nil {
-		return embedding, description, nil
+		return nil, "", fmt.Errorf("tesseract is not available")
 	}
 
 	command := exec.CommandContext(ctx, "tesseract", framePath, "stdout")
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return embedding, description, nil
+		return nil, "", fmt.Errorf("tesseract OCR failed: %w", err)
 	}
+
 	text := strings.Join(strings.Fields(string(output)), " ")
 	if text == "" {
-		return embedding, description, nil
+		return nil, "", fmt.Errorf("no OCR text extracted")
 	}
 	if len(text) > 180 {
 		text = text[:180]
 	}
+	embeddingVector, err := e.textEmbedder.EmbedText(ctx, text)
+	if err != nil {
+		return nil, "", fmt.Errorf("embed OCR text: %w", err)
+	}
 
-	return embedding, fmt.Sprintf("keyframe text: %s", text), nil
+	return embeddingVector, fmt.Sprintf("keyframe text: %s", text), nil
 }
 
 var _ Ingester = (*RealIngester)(nil)

@@ -5,9 +5,12 @@ Goal: verify that local `real` ingestion returns content-grounded results for on
 ## Preconditions
 
 - `VIDERA_INGESTION_MODE=real`
+- `VIDERA_VISUAL_BACKEND` set to expected path (`ocr` baseline or `clip` for CLIP validation)
 - Video file and transcript sidecar exist next to each other (for current local validation path):
   - `./videos/<clip>.MOV`
   - `./videos/<clip>.srt` (or `.vtt` / `.txt`)
+- Runtime has visual OCR capability (`tesseract`) and keyframe extraction capability (`ffmpeg`).
+- For CLIP validation, runtime has native ONNX Runtime library access (`VIDERA_CLIP_ORT_LIB_PATH`) and a readable `VIDERA_CLIP_MODEL_PATH`.
 - Service running via local MCP endpoint (`http://localhost:8080/mcp`)
 
 ## Known Clip Setup
@@ -47,6 +50,7 @@ Pass criteria:
 
 Pass criteria:
 - At least one plausible visual hit exists within expected window.
+- Visual snippets should reflect backend-derived content (OCR or CLIP), never simulated placeholders.
 
 ### 4) Determinism check
 
@@ -94,3 +98,4 @@ Open issues:
 - Spoken phrase retrieval window passes.
 - Visual cue retrieval passes.
 - Determinism passes for repeated queries.
+- No simulated visual fallback content is observed in real mode.

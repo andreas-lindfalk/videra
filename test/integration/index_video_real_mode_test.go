@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -118,4 +119,36 @@ func TestIndexVideoRealModeRequiresSidecarForLocalPath(t *testing.T) {
 	text, ok := mcp.AsTextContent(result.Content[0])
 	require.True(t, ok)
 	require.Contains(t, text.Text, "sidecar transcript")
+}
+
+func TestRealModeCLIPBackendMissingModelPathFailsStartup(t *testing.T) {
+	ctx := context.Background()
+
+	logs := startVideraContainerExpectStartupFailureWithEnvAndDockerTarget(t, ctx, map[string]string{
+		"VIDERA_INGESTION_MODE": "real",
+		"VIDERA_VISUAL_BACKEND": "clip",
+	}, defaultVideraDockerTarget)
+
+	require.Contains(t, logs, "VIDERA_CLIP_MODEL_PATH cannot be empty when VIDERA_VISUAL_BACKEND=clip")
+}
+
+func TestRealModeCLIPBackendUnavailableFallsBackToOCRAtStartup(t *testing.T) {
+	ctx := context.Background()
+	ctr, cli := startVideraContainerWithEnv(t, ctx, map[string]string{
+		"VIDERA_INGESTION_MODE":  "real",
+		"VIDERA_VISUAL_BACKEND":  "clip",
+		"VIDERA_CLIP_MODEL_PATH": "/tmp/clip-image-model.onnx",
+		"VIDERA_STORAGE_BACKEND": "chromem",
+	})
+
+	result, err := cli.CallTool(ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{Name: "list_videos"}})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+
+	logs := readContainerLogs(t, ctx, ctr)
+	require.True(t,
+		strings.Contains(logs, "clip visual backend unavailable") && strings.Contains(logs, "falling back to ocr"),
+		"expected startup fallback warning in logs, got: %s",
+		logs,
+	)
 }

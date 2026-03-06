@@ -1,4 +1,4 @@
-.PHONY: build build-lancedb-native test integration-test integration-test-fresh integration-test-lancedb-native docker-build docker-build-slim docker-build-full docker-build-lancedb-native run-stdio run-http run-stdio-full run-http-full run-stdio-lancedb-native run-http-lancedb-native local-up local-down local-smoke local-smoke-default local-index-folder local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate storage-benchmark-gate storage-benchmark-capture storage-benchmark-summarize rollback-rehearsal-capture rollback-rehearsal-summarize gate-parity-capture gate-parity-summarize phase32-candidate-proof-pack phase32-candidate-proof-pack-summarize
+.PHONY: build build-lancedb-native test integration-test integration-test-fresh integration-test-lancedb-native docker-build docker-build-slim docker-build-full docker-build-lancedb-native docker-build-lancedb-native-clip run-stdio run-http run-stdio-full run-http-full run-stdio-lancedb-native run-http-lancedb-native run-stdio-lancedb-native-clip run-http-lancedb-native-clip local-up local-down local-smoke local-smoke-default local-index-folder local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate storage-benchmark-gate storage-benchmark-capture storage-benchmark-summarize rollback-rehearsal-capture rollback-rehearsal-summarize gate-parity-capture gate-parity-summarize phase32-candidate-proof-pack phase32-candidate-proof-pack-summarize
 
 build:
 	go build -o bin/videra ./cmd/videra
@@ -39,6 +39,9 @@ docker-build-full:
 docker-build-lancedb-native:
 	docker build --platform $${LANCEDB_DOCKER_PLATFORM:-linux/amd64} --target runtime-lancedb-native --build-arg LANCEDB_NATIVE_VERSION=$${LANCEDB_NATIVE_VERSION:-v0.1.2} -t videra:dev-lancedb-native .
 
+docker-build-lancedb-native-clip:
+	docker build --platform $${LANCEDB_DOCKER_PLATFORM:-linux/amd64} --target runtime-lancedb-native-clip --build-arg LANCEDB_NATIVE_VERSION=$${LANCEDB_NATIVE_VERSION:-v0.1.2} -t videra:dev-lancedb-native-clip .
+
 run-stdio: docker-build-lancedb-native
 	docker run -i --rm -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
 
@@ -56,6 +59,12 @@ run-stdio-lancedb-native: docker-build-lancedb-native
 
 run-http-lancedb-native: docker-build-lancedb-native
 	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
+
+run-stdio-lancedb-native-clip: docker-build-lancedb-native-clip
+	docker run -i --rm -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native-clip
+
+run-http-lancedb-native-clip: docker-build-lancedb-native-clip
+	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native-clip
 
 local-up:
 	VIDERA_DOCKER_TARGET=$${VIDERA_DOCKER_TARGET:-runtime-lancedb-native} \

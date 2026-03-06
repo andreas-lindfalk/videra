@@ -19,6 +19,10 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_INDEX_CONCURRENCY` (default `4`)
 - `VIDERA_SEARCH_AUDIO_WEIGHT` (default `1.0`)
 - `VIDERA_SEARCH_VISUAL_WEIGHT` (default `1.0`)
+- `VIDERA_VISUAL_BACKEND` (`ocr|clip`, default `ocr`)
+- `VIDERA_CLIP_MODEL_PATH` (required when `VIDERA_VISUAL_BACKEND=clip`)
+- `VIDERA_CLIP_ORT_LIB_PATH` (default `/usr/local/lib/libonnxruntime.so`)
+- `VIDERA_CLIP_INPUT_SIZE` (default `224`)
 - `VIDERA_SEMANTIC_CANONICAL_MAP` (optional, default empty/off; comma-separated `source=canonical` pairs)
 
 ## Real-Ingestion Extras
@@ -69,6 +73,7 @@ Notes:
 - Reproducible queue evidence baselines are tracked in `tasks/platform/queue-benchmark-evidence.md`.
 - LanceDB backend native path is build-tag-gated (`lancedb_native`) and requires native artifacts + CGO linker/header configuration in build/runtime environments.
 - Native Docker operator profile is `runtime-lancedb-native` (Make targets: `docker-build-lancedb-native`, `run-http-lancedb-native`).
+- CLIP-capable native operator profile is `runtime-lancedb-native-clip` (Make targets: `docker-build-lancedb-native-clip`, `run-http-lancedb-native-clip`).
 - Native Docker build platform defaults to `linux/amd64` (`LANCEDB_DOCKER_PLATFORM`) to match currently published upstream Linux native artifacts.
 
 Notes:
@@ -79,6 +84,8 @@ Notes:
 ## Image Profile Contract (Phase 7)
 
 - `runtime-lancedb-native` is the local default runtime baseline for LanceDB-backed operation.
+- `runtime-lancedb-native` includes ffmpeg + OCR capability (`tesseract`) for real-mode visual segment extraction.
+- `runtime-lancedb-native-clip` extends `runtime-lancedb-native` with native ONNX Runtime shared library artifacts to enable CLIP ONNX visual embedding path.
 - `slim` profile remains a minimal non-native fallback profile.
 - `full` profile extends `slim` with runtime dependencies needed for fallback tooling (Whisper path + OCR tooling).
 - MCP API/tool/resource behavior must remain identical across profiles; differences are runtime capability only.

@@ -57,6 +57,8 @@ func TestRuntimeCapabilitiesSummaryIncludesAllFlags(t *testing.T) {
 		Python3:             true,
 		PythonWhisperModule: true,
 		Tesseract:           false,
+		ONNXRuntimeLibrary:  true,
+		ONNXRuntimeLibPath:  "/usr/local/lib/libonnxruntime.so",
 	}
 
 	summary := capabilities.Summary()
@@ -66,4 +68,12 @@ func TestRuntimeCapabilitiesSummaryIncludesAllFlags(t *testing.T) {
 	require.Contains(t, summary, "python_whisper_module=true")
 	require.Contains(t, summary, "whisper_fallback=true")
 	require.Contains(t, summary, "tesseract=false")
+	require.Contains(t, summary, "onnxruntime_library=true")
+	require.Contains(t, summary, "onnxruntime_library_path=/usr/local/lib/libonnxruntime.so")
+	require.Contains(t, summary, "clip_visual=true")
+}
+
+func TestRuntimeCapabilitiesCLIPVisualAvailableDependsOnONNXLibrary(t *testing.T) {
+	require.False(t, RuntimeCapabilities{ONNXRuntimeLibrary: false}.CLIPVisualAvailable())
+	require.True(t, RuntimeCapabilities{ONNXRuntimeLibrary: true}.CLIPVisualAvailable())
 }

@@ -26,6 +26,10 @@ type IndexOptions struct {
 	RemoteFetchDisabled   bool
 	RemoteFetchTimeoutSec int
 	RemoteFetchMaxMB      int
+	VisualBackend         string
+	CLIPModelPath         string
+	CLIPORTLibraryPath    string
+	CLIPInputSize         int
 }
 
 type IndexMode string

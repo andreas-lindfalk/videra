@@ -21,6 +21,10 @@ This artifact explains:
 - Default mode is `VIDERA_INGESTION_MODE=simulated` (fixture-like placeholder segments for deterministic testing).
 - A new local `real` ingestion mode is available: `VIDERA_INGESTION_MODE=real` uses sidecar transcript files (`.srt`, `.vtt`, `.txt`) next to the video file.
 - In `real` mode, if no sidecar is found, Videra attempts FFmpeg audio extraction + Whisper CLI transcription (`whisper` or `python3 -m whisper`).
+- In `real` mode, visual segments are generated from OCR-extracted keyframe text (`tesseract`) and embedded as searchable visual context.
+- In `real` mode, visual fallback is explicit: if keyframes/OCR are unavailable, visual segments are skipped (no simulated visual placeholders).
+- Real-mode visual backend is configurable via `VIDERA_VISUAL_BACKEND` (`ocr` default, `clip` optional via ONNX runtime path).
+- When `VIDERA_VISUAL_BACKEND=clip` is configured but CLIP runtime/model dependencies are unavailable, startup logs explicit fallback to OCR.
 - In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
 - `index_video` supports `mode=async` for non-blocking indexing; poll status via `get_index_job` using returned `jobId`.
 - Async queue backend is runtime-selectable via `VIDERA_JOBQUEUE_BACKEND` (`inprocess` default; `nats` and `redis` available), with runtime role split support via `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`).
@@ -51,6 +55,16 @@ Use the full tool-complete runtime profile when you need real-mode fallback tool
 
 ```bash
 VIDERA_DOCKER_TARGET=runtime-full VIDERA_STORAGE_BACKEND=chromem make local-up
+```
+
+Use the CLIP-capable native profile when validating ONNX visual embeddings in real mode:
+
+```bash
+VIDERA_DOCKER_TARGET=runtime-lancedb-native-clip \
+VIDERA_INGESTION_MODE=real \
+VIDERA_VISUAL_BACKEND=clip \
+VIDERA_CLIP_MODEL_PATH=/models/clip-image-model.onnx \
+make local-up
 ```
 
 ### 2) Run deterministic smoke test with a local file
@@ -98,6 +112,13 @@ Remote media fetch controls (used when `index_video` path is `http://` or `https
 - `VIDERA_REMOTE_FETCH_ENABLED` (default: `true`)
 - `VIDERA_REMOTE_FETCH_TIMEOUT_SEC` (default: `60`)
 - `VIDERA_REMOTE_FETCH_MAX_MB` (default: `200`)
+
+Visual backend controls for `real` mode:
+
+- `VIDERA_VISUAL_BACKEND` (`ocr|clip`, default: `ocr`)
+- `VIDERA_CLIP_MODEL_PATH` (required when backend is `clip`)
+- `VIDERA_CLIP_ORT_LIB_PATH` (default: `/usr/local/lib/libonnxruntime.so`)
+- `VIDERA_CLIP_INPUT_SIZE` (default: `224`)
 
 ```bash
 VIDERA_VIDEO_DIR=/absolute/path/to/your/video/folder make local-up
@@ -160,12 +181,15 @@ Practical flow:
 - Docker build (LanceDB native default): `make docker-build` or `make docker-build-lancedb-native`
 - Docker build (full tool-complete): `make docker-build-full`
 - Docker build (LanceDB native): `make docker-build-lancedb-native`
+- Docker build (LanceDB native + CLIP native ONNX Runtime): `make docker-build-lancedb-native-clip`
 - Stdio run: `make run-stdio`
 - HTTP run: `make run-http`
 - Stdio run (full): `make run-stdio-full`
 - HTTP run (full): `make run-http-full`
 - Stdio run (LanceDB native): `make run-stdio-lancedb-native`
 - HTTP run (LanceDB native): `make run-http-lancedb-native`
+- Stdio run (LanceDB native + CLIP native ONNX Runtime): `make run-stdio-lancedb-native-clip`
+- HTTP run (LanceDB native + CLIP native ONNX Runtime): `make run-http-lancedb-native-clip`
 
 ## MVP Release Gate (Phase 16)
 
