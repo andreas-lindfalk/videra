@@ -88,7 +88,7 @@ func Load() (Config, error) {
 		Transport:             TransportStdio,
 		HTTPAddr:              ":8080",
 		DataDir:               "./data",
-		StorageBackend:        StorageBackendChromem,
+		StorageBackend:        StorageBackendLanceDB,
 		LanceDBURI:            "",
 		LanceDBRegion:         "",
 		LanceDBTable:          "videra_segments",

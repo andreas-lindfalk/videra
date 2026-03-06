@@ -302,3 +302,8 @@
 ## 2026-03-06 — Build-Tag Stub Cleanup Pattern
 
 - **Prefer build-tag registration over duplicate stub files when only one implementation should vary by tag.** A shared untagged factory entrypoint plus native `init()` registration keeps default behavior explicit while reducing file clutter.
+
+## 2026-03-06 — Local Workflow Tooling Regression Guardrail
+
+- **Validate new helper commands immediately with formatting + compile checks.** Running `gofmt` and a focused `go test ./cmd/<tool>` right after adding a new local CLI catches malformed files before downstream edits compound the failure.
+- **Prefer simple line-oriented shell loops over heredoc-heavy Make recipes.** Complex heredoc blocks are fragile in tab-indented Make targets and can produce hard-to-read parser errors (`missing separator`).

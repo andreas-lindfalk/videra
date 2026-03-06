@@ -4,8 +4,8 @@ Goal: run Videra in an EU-hosted Hetzner VM with persistent data, TLS, and a sta
 
 Image profile guidance:
 
-- Use `*-slim` image tags for minimal/default flows.
-- Use `*-full` image tags when real-mode fallback tooling (Whisper/OCR) is required.
+- Use `*-lancedb-native` image tags for default LanceDB-backed operation.
+- Use `*-full` image tags with `VIDERA_STORAGE_BACKEND=chromem` when real-mode fallback tooling (Whisper/OCR) is required.
 
 ## 0) Baseline choices
 
@@ -72,6 +72,7 @@ cat > /opt/videra/.env <<'EOF'
 VIDERA_TRANSPORT=http
 VIDERA_HTTP_ADDR=:8080
 VIDERA_DATA_DIR=/data
+VIDERA_STORAGE_BACKEND=lancedb
 VIDERA_LOG_LEVEL=info
 VIDERA_RUNTIME_MODE=prod
 VIDERA_INGESTION_MODE=real
@@ -79,11 +80,12 @@ VIDERA_REMOTE_FETCH_ENABLED=true
 VIDERA_REMOTE_FETCH_TIMEOUT_SEC=60
 VIDERA_REMOTE_FETCH_MAX_MB=200
 DOMAIN=<your-domain>
-VIDERA_IMAGE=ghcr.io/andreas-lindfalk/videra:latest-full
+VIDERA_IMAGE=ghcr.io/andreas-lindfalk/videra:latest-lancedb-native
 EOF
 ```
 
 If you do not publish to GHCR yet, replace `VIDERA_IMAGE` with your registry/tag.
+If you run a `*-full` image, set `VIDERA_STORAGE_BACKEND=chromem`.
 
 ## 5) Add compose and Caddy config
 
@@ -100,6 +102,7 @@ services:
       VIDERA_TRANSPORT: ${VIDERA_TRANSPORT}
       VIDERA_HTTP_ADDR: ${VIDERA_HTTP_ADDR}
       VIDERA_DATA_DIR: ${VIDERA_DATA_DIR}
+      VIDERA_STORAGE_BACKEND: ${VIDERA_STORAGE_BACKEND}
       VIDERA_LOG_LEVEL: ${VIDERA_LOG_LEVEL}
       VIDERA_RUNTIME_MODE: ${VIDERA_RUNTIME_MODE}
     volumes:

@@ -24,9 +24,9 @@ This artifact explains:
 - In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
 - `index_video` supports `mode=async` for non-blocking indexing; poll status via `get_index_job` using returned `jobId`.
 - Async queue backend is runtime-selectable via `VIDERA_JOBQUEUE_BACKEND` (`inprocess` default; `nats` and `redis` available), with runtime role split support via `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`).
-- Storage backend is runtime-selectable via `VIDERA_STORAGE_BACKEND` (`chromem` default). `lancedb` now uses a LanceDB-backed adapter path.
+- Storage backend is runtime-selectable via `VIDERA_STORAGE_BACKEND` (`lancedb` default). `chromem` remains available as an explicit fallback.
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
-- Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
+- Container runtime profile strategy (`runtime-lancedb-native` local default; `slim`/`full` optional profiles) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
 ## Quick Start (Local, Non-Cloud)
 
@@ -46,11 +46,11 @@ make local-up
 
 This starts the service on `http://localhost:8080/mcp`.
 
-By default, local compose builds the `runtime-slim` profile.
-Use the full tool-complete runtime profile when you need real-mode fallback tooling:
+By default, local compose builds the `runtime-lancedb-native` profile on `linux/amd64`.
+Use the full tool-complete runtime profile when you need real-mode fallback tooling (Whisper/OCR):
 
 ```bash
-VIDERA_DOCKER_TARGET=runtime-full make local-up
+VIDERA_DOCKER_TARGET=runtime-full VIDERA_STORAGE_BACKEND=chromem make local-up
 ```
 
 ### 2) Run deterministic smoke test with a local file
@@ -84,7 +84,7 @@ Then run:
 
 ```bash
 VIDERA_INGESTION_MODE=real make local-up
-make local-smoke VIDEO=/videos/videos/IMG_3711.MOV QUERY="test query"
+make local-smoke VIDEO=/videos/IMG_3711.MOV QUERY="test query"
 make local-down
 ```
 
@@ -104,8 +104,20 @@ VIDERA_VIDEO_DIR=/absolute/path/to/your/video/folder make local-up
 make local-smoke VIDEO=/videos/your-file.mp4 QUERY="test query"
 ```
 
-If you do not set `VIDERA_VIDEO_DIR`, compose mounts the repo root (`.`) to `/videos`.
-So a file at `./videos/IMG_3711.MOV` is visible in-container as `/videos/videos/IMG_3711.MOV`.
+If you do not set `VIDERA_VIDEO_DIR`, compose mounts `./videos` to `/videos`.
+So a file at `./videos/IMG_3711.MOV` is visible in-container as `/videos/IMG_3711.MOV`.
+
+Index all videos in one folder with MCP `index_video` calls:
+
+```bash
+make local-index-folder
+```
+
+Or specify a custom host folder:
+
+```bash
+make local-index-folder VIDEO_DIR=/absolute/path/to/videos
+```
 
 The smoke command validates this full flow:
 
@@ -145,7 +157,7 @@ Practical flow:
 - MVP split-role critical checks: `make release-gate-split`
 - MVP release gate preflight: `make release-gate-preflight`
 - MVP release gate cleanup (if local Docker pressure): `make release-gate-clean`
-- Docker build (slim default): `make docker-build` or `make docker-build-slim`
+- Docker build (LanceDB native default): `make docker-build` or `make docker-build-lancedb-native`
 - Docker build (full tool-complete): `make docker-build-full`
 - Docker build (LanceDB native): `make docker-build-lancedb-native`
 - Stdio run: `make run-stdio`
@@ -219,7 +231,7 @@ Example initiation payload:
 
 Queue runtime environment options (Phase 12):
 
-- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`; default `chromem`)
+- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`; default `lancedb`)
 - LanceDB options (used when `VIDERA_STORAGE_BACKEND=lancedb`):
 	- `VIDERA_LANCEDB_URI` (optional; defaults to local path under `VIDERA_DATA_DIR`)
 	- `VIDERA_LANCEDB_REGION` (optional; required only for `db://` cloud URIs)
@@ -263,11 +275,10 @@ Queue payloads are job instructions (source reference + job metadata), not video
 
 LanceDB runtime note:
 
-- Default builds do not require LanceDB native artifacts.
-- `lancedb` backend path is enabled with build tag `lancedb_native` and then uses native `github.com/lancedb/lancedb-go`.
+- `lancedb` backend path is enabled with build tag `lancedb_native` and uses native `github.com/lancedb/lancedb-go`.
 - Native mode requires LanceDB artifacts (`include/lancedb.h` + platform library) plus CGO flags (`CGO_CFLAGS`, `CGO_LDFLAGS`).
 - For cloud LanceDB URIs (`db://...`), `VIDERA_LANCEDB_REGION` is required; for local file-backed URI it is optional.
-- For team onboarding, package those artifacts into Docker/CI images and run the server with `-tags lancedb_native`; keep `chromem` as zero-dependency default for local contributors.
+- For team onboarding, package those artifacts into Docker/CI images and run the server with `-tags lancedb_native`; use `chromem` only as an explicit fallback when native artifacts/profile are not in use.
 - Native operator path is first-class via `runtime-lancedb-native` Docker target and `make docker-build-lancedb-native` / `make run-http-lancedb-native`.
 - Native Docker build defaults to `linux/amd64` (`LANCEDB_DOCKER_PLATFORM`) because current upstream release artifacts are published for Linux amd64.
 

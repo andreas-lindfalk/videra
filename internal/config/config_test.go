@@ -47,6 +47,13 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.False(t, cfg.SplitSharedStorage)
 }
 
+func TestLoadDefaultsToLanceDBBackend(t *testing.T) {
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, StorageBackendLanceDB, cfg.StorageBackend)
+	require.Equal(t, "videra_segments", cfg.LanceDBTable)
+}
+
 func TestLoadInvalidTransportStillFails(t *testing.T) {
 	t.Setenv("VIDERA_TRANSPORT", "invalid")
 

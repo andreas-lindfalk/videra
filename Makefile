@@ -1,4 +1,4 @@
-.PHONY: build build-lancedb-native test integration-test integration-test-fresh integration-test-lancedb-native docker-build docker-build-slim docker-build-full docker-build-lancedb-native run-stdio run-http run-stdio-full run-http-full run-stdio-lancedb-native run-http-lancedb-native local-up local-down local-smoke local-smoke-default local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate storage-benchmark-gate storage-benchmark-capture storage-benchmark-summarize rollback-rehearsal-capture rollback-rehearsal-summarize gate-parity-capture gate-parity-summarize phase32-candidate-proof-pack phase32-candidate-proof-pack-summarize
+.PHONY: build build-lancedb-native test integration-test integration-test-fresh integration-test-lancedb-native docker-build docker-build-slim docker-build-full docker-build-lancedb-native run-stdio run-http run-stdio-full run-http-full run-stdio-lancedb-native run-http-lancedb-native local-up local-down local-smoke local-smoke-default local-index-folder local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate storage-benchmark-gate storage-benchmark-capture storage-benchmark-summarize rollback-rehearsal-capture rollback-rehearsal-summarize gate-parity-capture gate-parity-summarize phase32-candidate-proof-pack phase32-candidate-proof-pack-summarize
 
 build:
 	go build -o bin/videra ./cmd/videra
@@ -28,7 +28,7 @@ integration-test-fresh:
 integration-test-lancedb-native:
 	go test ./test/integration/... -v -tags=integration -run 'TestLanceDBNativeBackendIndexesAndSearches|TestLanceDBBackendOnDefaultRuntimeReturnsGuidanceError' -timeout=240s -count=1
 
-docker-build: docker-build-slim
+docker-build: docker-build-lancedb-native
 
 docker-build-slim:
 	docker build --target runtime-slim -t videra:dev -t videra:dev-slim .
@@ -39,11 +39,11 @@ docker-build-full:
 docker-build-lancedb-native:
 	docker build --platform $${LANCEDB_DOCKER_PLATFORM:-linux/amd64} --target runtime-lancedb-native --build-arg LANCEDB_NATIVE_VERSION=$${LANCEDB_NATIVE_VERSION:-v0.1.2} -t videra:dev-lancedb-native .
 
-run-stdio: docker-build-slim
-	docker run -i --rm videra:dev
+run-stdio: docker-build-lancedb-native
+	docker run -i --rm -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
 
-run-http: docker-build-slim
-	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http videra:dev
+run-http: docker-build-lancedb-native
+	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
 
 run-stdio-full: docker-build-full
 	docker run -i --rm videra:dev-full
@@ -58,6 +58,9 @@ run-http-lancedb-native: docker-build-lancedb-native
 	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
 
 local-up:
+	VIDERA_DOCKER_TARGET=$${VIDERA_DOCKER_TARGET:-runtime-lancedb-native} \
+	VIDERA_DOCKER_PLATFORM=$${VIDERA_DOCKER_PLATFORM:-linux/amd64} \
+	VIDERA_STORAGE_BACKEND=$${VIDERA_STORAGE_BACKEND:-lancedb} \
 	docker compose up -d --build
 
 local-down:
@@ -86,7 +89,29 @@ local-smoke-default:
 	fi; \
 	BASENAME="$$(basename "$$VIDEO_FILE")"; \
 	echo "Using ./videos/$$BASENAME"; \
-	$(MAKE) local-smoke VIDEO="/videos/videos/$$BASENAME" QUERY="$(or $(QUERY),test query)" ENDPOINT="$(or $(ENDPOINT),http://localhost:8080/mcp)"
+	$(MAKE) local-smoke VIDEO="/videos/$$BASENAME" QUERY="$(or $(QUERY),test query)" ENDPOINT="$(or $(ENDPOINT),http://localhost:8080/mcp)"
+
+local-index-folder:
+	@HOST_VIDEO_DIR="$(or $(VIDEO_DIR),$(VIDERA_VIDEO_DIR),./videos)"; \
+	if [ ! -d "$$HOST_VIDEO_DIR" ]; then \
+		echo "Missing video folder: $$HOST_VIDEO_DIR"; \
+		echo "Set VIDEO_DIR=/path/to/videos (or VIDERA_VIDEO_DIR) and try again."; \
+		exit 1; \
+	fi; \
+	VIDEO_LIST="$$(find "$$HOST_VIDEO_DIR" -type f \( -iname '*.mov' -o -iname '*.mp4' -o -iname '*.m4v' -o -iname '*.mkv' \) | sort)"; \
+	if [ -z "$$VIDEO_LIST" ]; then \
+		echo "No videos found in $$HOST_VIDEO_DIR (supported: .mov, .mp4, .m4v, .mkv)"; \
+		exit 1; \
+	fi; \
+	COUNT="$$(printf '%s\n' "$$VIDEO_LIST" | grep -c .)"; \
+	printf '%s\n' "$$VIDEO_LIST" | while IFS= read -r VIDEO_FILE; do \
+		[ -z "$$VIDEO_FILE" ] && continue; \
+		REL_PATH="$${VIDEO_FILE#$$HOST_VIDEO_DIR/}"; \
+		if [ "$$REL_PATH" = "$$VIDEO_FILE" ]; then REL_PATH="$$(basename "$$VIDEO_FILE")"; fi; \
+		echo "Indexing $$REL_PATH"; \
+		go run ./cmd/localindex --endpoint "$(or $(ENDPOINT),http://localhost:8080/mcp)" --video "/videos/$$REL_PATH"; \
+	done; \
+	echo "Indexed $$COUNT video(s). You can now query via MCP at $(or $(ENDPOINT),http://localhost:8080/mcp)."
 
 local-e2e: local-up local-smoke-default
 	@echo "Local MCP server is running at http://localhost:8080/mcp"

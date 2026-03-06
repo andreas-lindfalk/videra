@@ -7,7 +7,7 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_TRANSPORT` (`stdio` | `http`)
 - `VIDERA_HTTP_ADDR` (e.g. `:8080`)
 - `VIDERA_DATA_DIR` (persistent data path)
-- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`, default `chromem`; `lancedb` uses LanceDB-backed adapter path)
+- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`, default `lancedb`; `chromem` remains an explicit fallback)
 - `VIDERA_LANCEDB_URI` (optional; defaults to local path under `VIDERA_DATA_DIR`)
 - `VIDERA_LANCEDB_REGION` (optional; required only for `db://` cloud URIs)
 - `VIDERA_LANCEDB_TABLE` (default `videra_segments`)
@@ -78,7 +78,8 @@ Notes:
 
 ## Image Profile Contract (Phase 7)
 
-- `slim` profile is the default runtime baseline and should include ffmpeg-required paths for current default flows.
+- `runtime-lancedb-native` is the local default runtime baseline for LanceDB-backed operation.
+- `slim` profile remains a minimal non-native fallback profile.
 - `full` profile extends `slim` with runtime dependencies needed for fallback tooling (Whisper path + OCR tooling).
 - MCP API/tool/resource behavior must remain identical across profiles; differences are runtime capability only.
 - Missing optional tooling must be explicit in logs/errors rather than implicit/silent fallback.

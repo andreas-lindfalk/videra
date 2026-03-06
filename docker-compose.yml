@@ -1,13 +1,17 @@
 services:
   videra:
+    platform: ${VIDERA_DOCKER_PLATFORM:-linux/amd64}
     build:
       context: .
       dockerfile: Dockerfile
-      target: ${VIDERA_DOCKER_TARGET:-runtime-slim}
+      target: ${VIDERA_DOCKER_TARGET:-runtime-lancedb-native}
+      args:
+        LANCEDB_NATIVE_VERSION: ${LANCEDB_NATIVE_VERSION:-v0.1.2}
     environment:
       VIDERA_TRANSPORT: http
       VIDERA_HTTP_ADDR: :8080
       VIDERA_DATA_DIR: /data
+      VIDERA_STORAGE_BACKEND: ${VIDERA_STORAGE_BACKEND:-lancedb}
       VIDERA_RUNTIME_MODE: local
       VIDERA_INGESTION_MODE: simulated
       VIDERA_WHISPER_MODEL: tiny
@@ -21,4 +25,4 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/data
-      - ${VIDERA_VIDEO_DIR:-.}:/videos:ro
+      - ${VIDERA_VIDEO_DIR:-./videos}:/videos:ro

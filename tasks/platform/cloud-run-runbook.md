@@ -12,8 +12,8 @@ Goal: deploy Videra as a managed HTTPS MCP endpoint on GCP Cloud Run with operat
 
 Image profile guidance:
 
-- Use `runtime-slim` for minimal/simulated or sidecar-driven flows.
-- Use `runtime-full` when real-mode fallback tooling (Whisper/OCR) is required.
+- Use `runtime-lancedb-native` for default LanceDB-backed operation.
+- Use `runtime-full` with `VIDERA_STORAGE_BACKEND=chromem` when real-mode fallback tooling (Whisper/OCR) is required.
 
 ## 1) Prerequisites
 
@@ -28,7 +28,8 @@ export PROJECT_ID="<your-gcp-project-id>"
 export REGION="europe-west1"
 export REPO="videra"
 export SERVICE="videra-mcp"
-export PROFILE="full" # or: slim
+export PROFILE="lancedb-native" # or: full (with STORAGE_BACKEND=chromem)
+export STORAGE_BACKEND="lancedb"
 export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/videra:$(date +%Y%m%d-%H%M%S)-${PROFILE}"
 ```
 
@@ -81,8 +82,10 @@ gcloud run deploy "${SERVICE}" \
   --max-instances 1 \
   --cpu 1 \
   --memory 2Gi \
-  --set-env-vars "VIDERA_TRANSPORT=http,VIDERA_HTTP_ADDR=:8080,VIDERA_DATA_DIR=/tmp/videra-data,VIDERA_LOG_LEVEL=info,VIDERA_RUNTIME_MODE=prod,VIDERA_INGESTION_MODE=real,VIDERA_REMOTE_FETCH_ENABLED=true,VIDERA_REMOTE_FETCH_TIMEOUT_SEC=60,VIDERA_REMOTE_FETCH_MAX_MB=200"
+  --set-env-vars "VIDERA_TRANSPORT=http,VIDERA_HTTP_ADDR=:8080,VIDERA_DATA_DIR=/tmp/videra-data,VIDERA_STORAGE_BACKEND=${STORAGE_BACKEND},VIDERA_LOG_LEVEL=info,VIDERA_RUNTIME_MODE=prod,VIDERA_INGESTION_MODE=real,VIDERA_REMOTE_FETCH_ENABLED=true,VIDERA_REMOTE_FETCH_TIMEOUT_SEC=60,VIDERA_REMOTE_FETCH_MAX_MB=200"
 ```
+
+If using `PROFILE=full`, set `STORAGE_BACKEND=chromem` to avoid native-backend/runtime mismatch.
 
 Get service URL:
 
