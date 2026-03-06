@@ -48,6 +48,9 @@ type Config struct {
 	HTTPAddr              string
 	DataDir               string
 	StorageBackend        StorageBackend
+	LanceDBURI            string
+	LanceDBRegion         string
+	LanceDBTable          string
 	LogLevel              string
 	RuntimeMode           string
 	IngestionMode         IngestionMode
@@ -86,6 +89,9 @@ func Load() (Config, error) {
 		HTTPAddr:              ":8080",
 		DataDir:               "./data",
 		StorageBackend:        StorageBackendChromem,
+		LanceDBURI:            "",
+		LanceDBRegion:         "",
+		LanceDBTable:          "videra_segments",
 		LogLevel:              "info",
 		RuntimeMode:           "local",
 		IngestionMode:         IngestionModeSimulated,
@@ -129,6 +135,15 @@ func Load() (Config, error) {
 	}
 	if value, ok := os.LookupEnv("VIDERA_STORAGE_BACKEND"); ok {
 		cfg.StorageBackend = StorageBackend(strings.ToLower(strings.TrimSpace(value)))
+	}
+	if value, ok := os.LookupEnv("VIDERA_LANCEDB_URI"); ok {
+		cfg.LanceDBURI = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_LANCEDB_REGION"); ok {
+		cfg.LanceDBRegion = strings.TrimSpace(value)
+	}
+	if value, ok := os.LookupEnv("VIDERA_LANCEDB_TABLE"); ok {
+		cfg.LanceDBTable = strings.TrimSpace(value)
 	}
 	if value, ok := os.LookupEnv("VIDERA_LOG_LEVEL"); ok {
 		cfg.LogLevel = strings.ToLower(strings.TrimSpace(value))
@@ -274,6 +289,9 @@ func Load() (Config, error) {
 	}
 	if cfg.StorageBackend != StorageBackendChromem && cfg.StorageBackend != StorageBackendLanceDB {
 		return Config{}, fmt.Errorf("unsupported VIDERA_STORAGE_BACKEND: %s", cfg.StorageBackend)
+	}
+	if cfg.LanceDBTable == "" {
+		return Config{}, fmt.Errorf("VIDERA_LANCEDB_TABLE cannot be empty")
 	}
 	if cfg.FrameIntervalSec <= 0 {
 		return Config{}, fmt.Errorf("VIDERA_FRAME_INTERVAL_SEC must be > 0")

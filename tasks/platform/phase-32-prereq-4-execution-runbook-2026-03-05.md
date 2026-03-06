@@ -5,7 +5,7 @@ Scope: rollback rehearsal flow with explicit command capture and evidence update
 
 ## Current Capability Note
 
-Candidate backend mode is available via `VIDERA_STORAGE_BACKEND=lancedb` (compatibility layer).
+Candidate backend mode is available via `VIDERA_STORAGE_BACKEND=lancedb` (LanceDB adapter path).
 Use this rehearsal flow to prove candidate pre-check + rollback-to-stable gate rerun discipline.
 
 ## Commands (Current Rehearsal)

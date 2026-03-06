@@ -6,9 +6,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -19,6 +21,8 @@ import (
 
 const containerMCPPort = nat.Port("8080/tcp")
 const integrationStartupTimeout = 2 * time.Minute
+const defaultVideraDockerTarget = "runtime"
+const lanceDBNativeDockerTarget = "runtime-lancedb-native"
 
 func startVideraContainer(t *testing.T, ctx context.Context) (testcontainers.Container, *client.Client) {
 	return startVideraContainerWithEnv(t, ctx, nil)
@@ -33,9 +37,16 @@ func startVideraContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, 
 }
 
 func startVideraContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int, mounts []testcontainers.ContainerMount) (testcontainers.Container, *client.Client) {
+	return startVideraContainerWithEnvHostPortsAndMountsAndDockerTarget(t, ctx, envOverrides, hostPorts, mounts, defaultVideraDockerTarget)
+}
+
+func startVideraContainerWithEnvHostPortsAndMountsAndDockerTarget(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int, mounts []testcontainers.ContainerMount, dockerTarget string) (testcontainers.Container, *client.Client) {
 	t.Helper()
 
 	testcontainers.SkipIfProviderIsNotHealthy(t)
+	if strings.TrimSpace(dockerTarget) == "" {
+		dockerTarget = defaultVideraDockerTarget
+	}
 
 	env := map[string]string{
 		"VIDERA_TRANSPORT":    "http",
@@ -47,14 +58,30 @@ func startVideraContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Con
 		env[key] = value
 	}
 
+	buildRepo := "videra-integration"
+	buildTag := "latest"
+	if dockerTarget == lanceDBNativeDockerTarget {
+		buildRepo = "videra-integration-lancedb-native"
+		buildTag = strings.NewReplacer("/", "-", " ", "-", ":", "-", ".", "-").Replace(strings.ToLower(t.Name()))
+	}
+
+	buildConfig := testcontainers.FromDockerfile{
+		Context:    "../..",
+		Dockerfile: "Dockerfile",
+		Repo:       buildRepo,
+		Tag:        buildTag,
+		KeepImage:  true,
+		BuildOptionsModifier: func(options *dockertypes.ImageBuildOptions) {
+			options.Target = dockerTarget
+			if dockerTarget == lanceDBNativeDockerTarget {
+				options.Platform = "linux/amd64"
+				options.NoCache = true
+			}
+		},
+	}
+
 	customizers := []testcontainers.ContainerCustomizer{
-		testcontainers.WithDockerfile(testcontainers.FromDockerfile{
-			Context:    "../..",
-			Dockerfile: "Dockerfile",
-			Repo:       "videra-integration",
-			Tag:        "latest",
-			KeepImage:  true,
-		}),
+		testcontainers.WithDockerfile(buildConfig),
 		testcontainers.WithExposedPorts(string(containerMCPPort)),
 		testcontainers.WithEnv(env),
 		testcontainers.WithWaitStrategyAndDeadline(integrationStartupTimeout, wait.ForHTTP("/mcp").WithPort(containerMCPPort).WithStartupTimeout(integrationStartupTimeout)),
@@ -100,14 +127,78 @@ func startVideraContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Con
 	return ctr, cli
 }
 
+func startVideraContainerExpectStartupFailureWithEnvAndDockerTarget(t *testing.T, ctx context.Context, envOverrides map[string]string, dockerTarget string) string {
+	t.Helper()
+
+	testcontainers.SkipIfProviderIsNotHealthy(t)
+	if strings.TrimSpace(dockerTarget) == "" {
+		dockerTarget = defaultVideraDockerTarget
+	}
+
+	env := map[string]string{
+		"VIDERA_TRANSPORT":    "http",
+		"VIDERA_HTTP_ADDR":    ":8080",
+		"VIDERA_DATA_DIR":     "/data",
+		"VIDERA_RUNTIME_MODE": "test",
+	}
+	for key, value := range envOverrides {
+		env[key] = value
+	}
+
+	buildRepo := "videra-integration"
+	buildTag := "latest"
+	if dockerTarget == lanceDBNativeDockerTarget {
+		buildRepo = "videra-integration-lancedb-native"
+		buildTag = strings.NewReplacer("/", "-", " ", "-", ":", "-", ".", "-").Replace(strings.ToLower(t.Name()))
+	}
+
+	buildConfig := testcontainers.FromDockerfile{
+		Context:    "../..",
+		Dockerfile: "Dockerfile",
+		Repo:       buildRepo,
+		Tag:        buildTag,
+		KeepImage:  true,
+		BuildOptionsModifier: func(options *dockertypes.ImageBuildOptions) {
+			options.Target = dockerTarget
+			if dockerTarget == lanceDBNativeDockerTarget {
+				options.Platform = "linux/amd64"
+				options.NoCache = true
+			}
+		},
+	}
+
+	ctr, err := testcontainers.Run(
+		ctx,
+		"",
+		testcontainers.WithDockerfile(buildConfig),
+		testcontainers.WithExposedPorts(string(containerMCPPort)),
+		testcontainers.WithEnv(env),
+		testcontainers.WithWaitStrategyAndDeadline(
+			integrationStartupTimeout,
+			wait.ForLog("server failed").WithStartupTimeout(integrationStartupTimeout),
+		),
+	)
+	testcontainers.CleanupContainer(t, ctr)
+	require.NoError(t, err)
+
+	return readContainerLogs(t, ctx, ctr)
+}
+
 func startVideraWorkerContainerWithEnvAndHostPorts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int) testcontainers.Container {
 	return startVideraWorkerContainerWithEnvHostPortsAndMounts(t, ctx, envOverrides, hostPorts, nil)
 }
 
 func startVideraWorkerContainerWithEnvHostPortsAndMounts(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int, mounts []testcontainers.ContainerMount) testcontainers.Container {
+	return startVideraWorkerContainerWithEnvHostPortsAndMountsAndDockerTarget(t, ctx, envOverrides, hostPorts, mounts, defaultVideraDockerTarget)
+}
+
+func startVideraWorkerContainerWithEnvHostPortsAndMountsAndDockerTarget(t *testing.T, ctx context.Context, envOverrides map[string]string, hostPorts []int, mounts []testcontainers.ContainerMount, dockerTarget string) testcontainers.Container {
 	t.Helper()
 
 	testcontainers.SkipIfProviderIsNotHealthy(t)
+	if strings.TrimSpace(dockerTarget) == "" {
+		dockerTarget = defaultVideraDockerTarget
+	}
 
 	env := map[string]string{
 		"VIDERA_RUNTIME_MODE":  "test",
@@ -118,14 +209,30 @@ func startVideraWorkerContainerWithEnvHostPortsAndMounts(t *testing.T, ctx conte
 		env[key] = value
 	}
 
+	buildRepo := "videra-integration"
+	buildTag := "latest"
+	if dockerTarget == lanceDBNativeDockerTarget {
+		buildRepo = "videra-integration-lancedb-native"
+		buildTag = strings.NewReplacer("/", "-", " ", "-", ":", "-", ".", "-").Replace(strings.ToLower(t.Name()))
+	}
+
+	buildConfig := testcontainers.FromDockerfile{
+		Context:    "../..",
+		Dockerfile: "Dockerfile",
+		Repo:       buildRepo,
+		Tag:        buildTag,
+		KeepImage:  true,
+		BuildOptionsModifier: func(options *dockertypes.ImageBuildOptions) {
+			options.Target = dockerTarget
+			if dockerTarget == lanceDBNativeDockerTarget {
+				options.Platform = "linux/amd64"
+				options.NoCache = true
+			}
+		},
+	}
+
 	customizers := []testcontainers.ContainerCustomizer{
-		testcontainers.WithDockerfile(testcontainers.FromDockerfile{
-			Context:    "../..",
-			Dockerfile: "Dockerfile",
-			Repo:       "videra-integration",
-			Tag:        "latest",
-			KeepImage:  true,
-		}),
+		testcontainers.WithDockerfile(buildConfig),
 		testcontainers.WithEnv(env),
 		testcontainers.WithWaitStrategyAndDeadline(integrationStartupTimeout, wait.ForLog("queue worker started").WithStartupTimeout(integrationStartupTimeout)),
 	}

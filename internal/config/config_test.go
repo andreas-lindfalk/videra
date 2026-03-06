@@ -31,6 +31,9 @@ func TestLoadWorksWithoutAuthCoupling(t *testing.T) {
 	require.Equal(t, ":8080", cfg.HTTPAddr)
 	require.Equal(t, "./data", cfg.DataDir)
 	require.Equal(t, StorageBackendChromem, cfg.StorageBackend)
+	require.Equal(t, "", cfg.LanceDBURI)
+	require.Equal(t, "", cfg.LanceDBRegion)
+	require.Equal(t, "videra_segments", cfg.LanceDBTable)
 	require.Equal(t, "local", cfg.RuntimeMode)
 	require.Equal(t, IngestionModeSimulated, cfg.IngestionMode)
 	require.True(t, cfg.RemoteFetchEnabled)
@@ -66,6 +69,28 @@ func TestLoadInvalidStorageBackendFails(t *testing.T) {
 	_, err := Load()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported VIDERA_STORAGE_BACKEND")
+}
+
+func TestLoadParsesLanceDBRuntimeOptions(t *testing.T) {
+	t.Setenv("VIDERA_STORAGE_BACKEND", "lancedb")
+	t.Setenv("VIDERA_LANCEDB_URI", "db://project")
+	t.Setenv("VIDERA_LANCEDB_REGION", "eu-west-1")
+	t.Setenv("VIDERA_LANCEDB_TABLE", "videra_segments_test")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, StorageBackendLanceDB, cfg.StorageBackend)
+	require.Equal(t, "db://project", cfg.LanceDBURI)
+	require.Equal(t, "eu-west-1", cfg.LanceDBRegion)
+	require.Equal(t, "videra_segments_test", cfg.LanceDBTable)
+}
+
+func TestLoadInvalidLanceDBTableFails(t *testing.T) {
+	t.Setenv("VIDERA_LANCEDB_TABLE", "")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "VIDERA_LANCEDB_TABLE cannot be empty")
 }
 
 func TestLoadInvalidIngestionModeFails(t *testing.T) {

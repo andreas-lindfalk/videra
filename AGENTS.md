@@ -7,8 +7,8 @@ A high-performance MCP server written in Go that provides deep searchability in 
 - **Go 1.25.4** — module path: `github.com/andreas-lindfalk/videra`
 - **MCP SDK:** `github.com/mark3labs/mcp-go` (v0.44+) — pure MCP protocol, supports stdio + streamable HTTP
 - **Vector Store:** `github.com/philippgille/chromem-go` — embedded, pure Go, zero deps, file-persistent
-  - Replaces LanceDB from the original spec (no Go SDK exists for LanceDB)
-  - Migration path: LanceDB REST API or pgvector in Phase 3
+  - Default backend remains `chromem-go` for zero-dependency local/runtime portability.
+  - `lancedb` backend is available behind runtime toggle; current path in repo uses adapter isolation to preserve portability.
 - **Media Processing:** FFmpeg (in Docker) for audio/frame extraction
 - **Deployment:** Docker (local), Cloud Run (future)
 
@@ -85,7 +85,7 @@ When testing remote-source ingestion behavior in integration tests:
 | Decision | Chosen | Over | Reason |
 |---|---|---|---|
 | MCP SDK | mcp-go | Genkit | Genkit wraps mcp-go anyway; adds unnecessary framework weight for a server that exposes tools, not calls LLMs |
-| Vector store | chromem-go | LanceDB | No Go SDK for LanceDB; chromem-go is pure Go, embedded, zero-dep |
+| Vector store | chromem-go | LanceDB | chromem-go keeps default runtime zero-dep; LanceDB path exists but introduces native/runtime packaging considerations |
 | Test strategy | Testcontainers integration | Mocked unit tests | Real Docker containers catch real bugs; matches production runtime |
 | Transport | Stdio + HTTP | Stdio only | HTTP needed for testcontainers and future Cloud Run deployment |
 
@@ -164,7 +164,7 @@ Reference:
 ## Strategic Clarifications
 
 - External strategy ideas may reference LanceDB and `mcp-go-sdk`; implementation should still follow validated constraints in this repo:
-  - No native LanceDB Go SDK currently available.
+  - `lancedb-go` exists, but requires native CGO artifacts (`include` + platform libs) and explicit build/runtime packaging discipline.
   - MCP package in use is `github.com/mark3labs/mcp-go`.
 
 ## Decision Log (Immutable)
@@ -174,7 +174,7 @@ Use this as a quick historical ledger of decisions that should not be silently c
 | Date | Decision | Rationale | Change Requires |
 |---|---|---|---|
 | 2026-03-04 | MCP SDK = `github.com/mark3labs/mcp-go` | Most direct/control-focused Go MCP implementation; avoids framework indirection | Explicit architectural review + migration plan |
-| 2026-03-04 | Vector store (MVP) = `chromem-go` | No native LanceDB Go SDK; chromem-go is pure Go and embedded | Validation of alternative backend + compatibility plan |
+| 2026-03-04 | Vector store (MVP) = `chromem-go` | zero-dependency baseline for deterministic local/runtime portability | Validation of alternative backend + compatibility plan |
 | 2026-03-04 | Transport strategy = stdio + streamable HTTP | Stdio for local MCP clients; HTTP for integration tests/cloud deployment | Backward-compatibility check for local tooling |
 | 2026-03-04 | Test strategy = integration-first with testcontainers | Best production fidelity for this server architecture | Proof that alternate strategy catches equivalent failure modes |
 | 2026-03-04 | Deployment direction = local/on-prem + SaaS parity | Supports privacy-native and enterprise procurement requirements | Product + platform alignment review |

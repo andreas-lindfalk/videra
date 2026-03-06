@@ -1,7 +1,20 @@
-.PHONY: build test integration-test integration-test-fresh docker-build docker-build-slim docker-build-full run-stdio run-http run-stdio-full run-http-full local-up local-down local-smoke local-smoke-default local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate storage-benchmark-gate storage-benchmark-capture storage-benchmark-summarize rollback-rehearsal-capture rollback-rehearsal-summarize gate-parity-capture gate-parity-summarize phase32-candidate-proof-pack phase32-candidate-proof-pack-summarize
+.PHONY: build build-lancedb-native test integration-test integration-test-fresh integration-test-lancedb-native docker-build docker-build-slim docker-build-full docker-build-lancedb-native run-stdio run-http run-stdio-full run-http-full run-stdio-lancedb-native run-http-lancedb-native local-up local-down local-smoke local-smoke-default local-e2e release-gate release-gate-split release-gate-preflight release-gate-clean pilot-quality-gate real-corpus-promotion-gate deployment-promotion-gate storage-benchmark-gate storage-benchmark-capture storage-benchmark-summarize rollback-rehearsal-capture rollback-rehearsal-summarize gate-parity-capture gate-parity-summarize phase32-candidate-proof-pack phase32-candidate-proof-pack-summarize
 
 build:
 	go build -o bin/videra ./cmd/videra
+
+build-lancedb-native:
+	@LANCEDB_VERSION="$${LANCEDB_NATIVE_VERSION:-v0.1.2}"; \
+	OS="$$(go env GOOS)"; \
+	ARCH="$$(go env GOARCH)"; \
+	if [ ! -f "include/lancedb.h" ] || [ ! -f "lib/$${OS}_$$ARCH/liblancedb_go.a" ]; then \
+		echo "Downloading LanceDB native artifacts ($$LANCEDB_VERSION)..."; \
+		curl -sSL https://raw.githubusercontent.com/lancedb/lancedb-go/main/scripts/download-artifacts.sh | bash -s -- "$$LANCEDB_VERSION"; \
+	fi; \
+	CGO_CFLAGS="-I$(PWD)/include" \
+	CGO_LDFLAGS="$(PWD)/lib/$${OS}_$$ARCH/liblancedb_go.a $$( [ "$$OS" = "darwin" ] && echo "-framework Security -framework CoreFoundation" || echo "-lm -ldl -lpthread" )" \
+	CGO_ENABLED=1 \
+	go build -tags lancedb_native -o bin/videra-native ./cmd/videra
 
 test:
 	go test ./...
@@ -12,6 +25,9 @@ integration-test:
 integration-test-fresh:
 	go test ./test/integration/... -v -tags=integration -timeout=180s -count=1
 
+integration-test-lancedb-native:
+	go test ./test/integration/... -v -tags=integration -run 'TestLanceDBNativeBackendIndexesAndSearches|TestLanceDBBackendOnDefaultRuntimeReturnsGuidanceError' -timeout=240s -count=1
+
 docker-build: docker-build-slim
 
 docker-build-slim:
@@ -19,6 +35,9 @@ docker-build-slim:
 
 docker-build-full:
 	docker build --target runtime-full -t videra:dev-full .
+
+docker-build-lancedb-native:
+	docker build --platform $${LANCEDB_DOCKER_PLATFORM:-linux/amd64} --target runtime-lancedb-native --build-arg LANCEDB_NATIVE_VERSION=$${LANCEDB_NATIVE_VERSION:-v0.1.2} -t videra:dev-lancedb-native .
 
 run-stdio: docker-build-slim
 	docker run -i --rm videra:dev
@@ -31,6 +50,12 @@ run-stdio-full: docker-build-full
 
 run-http-full: docker-build-full
 	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http videra:dev-full
+
+run-stdio-lancedb-native: docker-build-lancedb-native
+	docker run -i --rm -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
+
+run-http-lancedb-native: docker-build-lancedb-native
+	docker run --rm -p 8080:8080 -e VIDERA_TRANSPORT=http -e VIDERA_STORAGE_BACKEND=lancedb videra:dev-lancedb-native
 
 local-up:
 	docker compose up -d --build

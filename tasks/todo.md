@@ -2,26 +2,7 @@
 
 ## Active Task
 
-### Phase 34 — Cross-Environment Parity Execution (Hetzner + Cloud Run)
-
-Status: IN PROGRESS
-
-Why this is next:
-
-- Phase 32 is closed (NO-GO) and parked by checkpoint decision.
-- The highest remaining release confidence gap is pending parity evidence in real Hetzner/Cloud Run environments.
-
-Primary artifacts:
-
-- `tasks/platform/parity-validation-checklist.md`
-- `tasks/platform/cross-environment-promotion-summary-2026-03-05.md`
-- `tasks/platform/cross-environment-promotion-summary-runbook-2026-03-05.md`
-
-Execution plan (current pass):
-
-- [ ] Execute parity checklist in Hetzner with dated evidence capture.
-- [ ] Execute parity checklist in Cloud Run with dated evidence capture.
-- [ ] Update unified cross-environment summary from CONDITIONAL to GO/NO-GO with rationale.
+_No active task._
 
 ## Definition of Done Template
 

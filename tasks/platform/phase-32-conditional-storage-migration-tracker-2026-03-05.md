@@ -73,3 +73,4 @@ Current state: activation checkpoint returned NO-GO; phase is closed and parked.
 - 2026-03-05: Candidate-mode prerequisite 1 benchmark comparison captured; criterion remains unmet because material backend benefit was not observed.
 - 2026-03-06: Activation checkpoint recorded as NO-GO because prerequisite 1 remains unmet; Phase 32 stays blocked pending re-open conditions.
 - 2026-03-06: Phase 32 archived as closed NO-GO; active work transitions to next roadmap task outside migration activation.
+- 2026-03-06: Phase 35 implemented a real LanceDB adapter path behind `VIDERA_STORAGE_BACKEND=lancedb`; Phase 32 evidence should be rerun on this implementation before any re-open decision.

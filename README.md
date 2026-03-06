@@ -24,7 +24,7 @@ This artifact explains:
 - In `real` mode, `index_video` now accepts remote HTTP(S) media URLs with bounded fetch controls (`VIDERA_REMOTE_FETCH_ENABLED`, `VIDERA_REMOTE_FETCH_TIMEOUT_SEC`, `VIDERA_REMOTE_FETCH_MAX_MB`).
 - `index_video` supports `mode=async` for non-blocking indexing; poll status via `get_index_job` using returned `jobId`.
 - Async queue backend is runtime-selectable via `VIDERA_JOBQUEUE_BACKEND` (`inprocess` default; `nats` and `redis` available), with runtime role split support via `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`).
-- Storage backend is runtime-selectable via `VIDERA_STORAGE_BACKEND` (`chromem` default). `lancedb` now runs through a compatibility layer backed by `chromem-go` in a backend-scoped data path.
+- Storage backend is runtime-selectable via `VIDERA_STORAGE_BACKEND` (`chromem` default). `lancedb` now uses a LanceDB-backed adapter path.
 - Deployment parity planning (Cloud Run + Hetzner) and real semantic ingestion are tracked in `tasks/todo.md` and `tasks/platform/hetzner-gcp-parity-primer.md`.
 - Container runtime profile strategy (`slim` default + `full` tool-complete) is tracked in `tasks/platform/container-runtime-profiles.md`.
 
@@ -136,6 +136,7 @@ Practical flow:
 - Fast tests: `make test`
 - Integration tests: `make integration-test`
 - Integration tests (fresh run): `make integration-test-fresh`
+- Integration tests (LanceDB native path): `make integration-test-lancedb-native`
 - Pilot quality gate (benchmark + real-mode guardrails): `make pilot-quality-gate`
 - Real-corpus promotion gate: `make real-corpus-promotion-gate`
 - Deployment promotion gate (consolidated): `make deployment-promotion-gate`
@@ -146,10 +147,13 @@ Practical flow:
 - MVP release gate cleanup (if local Docker pressure): `make release-gate-clean`
 - Docker build (slim default): `make docker-build` or `make docker-build-slim`
 - Docker build (full tool-complete): `make docker-build-full`
+- Docker build (LanceDB native): `make docker-build-lancedb-native`
 - Stdio run: `make run-stdio`
 - HTTP run: `make run-http`
 - Stdio run (full): `make run-stdio-full`
 - HTTP run (full): `make run-http-full`
+- Stdio run (LanceDB native): `make run-stdio-lancedb-native`
+- HTTP run (LanceDB native): `make run-http-lancedb-native`
 
 ## MVP Release Gate (Phase 16)
 
@@ -216,6 +220,10 @@ Example initiation payload:
 Queue runtime environment options (Phase 12):
 
 - `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`; default `chromem`)
+- LanceDB options (used when `VIDERA_STORAGE_BACKEND=lancedb`):
+	- `VIDERA_LANCEDB_URI` (optional; defaults to local path under `VIDERA_DATA_DIR`)
+	- `VIDERA_LANCEDB_REGION` (optional; required only for `db://` cloud URIs)
+	- `VIDERA_LANCEDB_TABLE` (default `videra_segments`)
 - `VIDERA_JOBQUEUE_BACKEND` (`inprocess|nats|redis`; default `inprocess`)
 - `VIDERA_JOBQUEUE_ROLE` (`all|api|worker`; default `all`)
 - `VIDERA_JOBQUEUE_RETRY_MAX_ATTEMPTS` (default `3`)
@@ -252,6 +260,16 @@ Queue lifecycle observability keys (Phase 14):
 - Core events: `enqueued`, `reserved`, `retry_scheduled`, `completed`, `retry_exhausted`, `retry_failed_terminal`.
 
 Queue payloads are job instructions (source reference + job metadata), not video bytes.
+
+LanceDB runtime note:
+
+- Default builds do not require LanceDB native artifacts.
+- `lancedb` backend path is enabled with build tag `lancedb_native` and then uses native `github.com/lancedb/lancedb-go`.
+- Native mode requires LanceDB artifacts (`include/lancedb.h` + platform library) plus CGO flags (`CGO_CFLAGS`, `CGO_LDFLAGS`).
+- For cloud LanceDB URIs (`db://...`), `VIDERA_LANCEDB_REGION` is required; for local file-backed URI it is optional.
+- For team onboarding, package those artifacts into Docker/CI images and run the server with `-tags lancedb_native`; keep `chromem` as zero-dependency default for local contributors.
+- Native operator path is first-class via `runtime-lancedb-native` Docker target and `make docker-build-lancedb-native` / `make run-http-lancedb-native`.
+- Native Docker build defaults to `linux/amd64` (`LANCEDB_DOCKER_PLATFORM`) because current upstream release artifacts are published for Linux amd64.
 
 Redis-first rollout guidance:
 

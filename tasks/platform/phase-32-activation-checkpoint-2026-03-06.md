@@ -43,3 +43,8 @@ If re-opened, rerun:
 - `make gate-parity-capture BACKEND=<candidate-backend> ...` (rerun for stability confirmation if needed)
 
 Then update this checkpoint file with a dated addendum.
+
+## Addendum — 2026-03-06 (Post-checkpoint)
+
+- Phase 35 implemented a real LanceDB adapter path behind `VIDERA_STORAGE_BACKEND=lancedb` (replacing compatibility-mode behavior used during this checkpoint).
+- This checkpoint verdict remains historically correct for its captured evidence set, but measured-benefit and parity evidence should be refreshed against the new backend implementation before any migration re-open decision.

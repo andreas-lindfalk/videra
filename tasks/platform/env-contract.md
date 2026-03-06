@@ -7,7 +7,10 @@ Goal: keep a shared runtime contract across local, Hetzner, and Cloud Run where 
 - `VIDERA_TRANSPORT` (`stdio` | `http`)
 - `VIDERA_HTTP_ADDR` (e.g. `:8080`)
 - `VIDERA_DATA_DIR` (persistent data path)
-- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`, default `chromem`; `lancedb` currently maps to a compatibility layer backed by `chromem-go` in a backend-scoped data directory)
+- `VIDERA_STORAGE_BACKEND` (`chromem|lancedb`, default `chromem`; `lancedb` uses LanceDB-backed adapter path)
+- `VIDERA_LANCEDB_URI` (optional; defaults to local path under `VIDERA_DATA_DIR`)
+- `VIDERA_LANCEDB_REGION` (optional; required only for `db://` cloud URIs)
+- `VIDERA_LANCEDB_TABLE` (default `videra_segments`)
 - `VIDERA_LOG_LEVEL` (`debug|info|warn|error`)
 - `VIDERA_RUNTIME_MODE` (`local|test|prod`)
 - `VIDERA_INGESTION_MODE` (`simulated|real`)
@@ -64,6 +67,9 @@ Notes:
 - When `VIDERA_SPLIT_SHARED_STORAGE=false`, `get_index_job` remains shared-state correct but API-visible indexed content can be degraded in non-shared topologies (startup warning emitted).
 - Redis-first rollout operations and rollback drills are documented in `tasks/platform/queue-redis-first-runbook.md`.
 - Reproducible queue evidence baselines are tracked in `tasks/platform/queue-benchmark-evidence.md`.
+- LanceDB backend native path is build-tag-gated (`lancedb_native`) and requires native artifacts + CGO linker/header configuration in build/runtime environments.
+- Native Docker operator profile is `runtime-lancedb-native` (Make targets: `docker-build-lancedb-native`, `run-http-lancedb-native`).
+- Native Docker build platform defaults to `linux/amd64` (`LANCEDB_DOCKER_PLATFORM`) to match currently published upstream Linux native artifacts.
 
 Notes:
 - In `real` mode, ingestion first looks for sidecar transcript files (`.srt`/`.vtt`/`.txt`).

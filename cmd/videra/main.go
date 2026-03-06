@@ -61,18 +61,17 @@ func run() error {
 	case config.StorageBackendLanceDB:
 		store, err = storage.NewLanceDBStoreWithOptions(cfg.DataDir, storeEmbedder, storage.LanceDBStoreOptions{
 			SplitSharedStorage: cfg.SplitSharedStorage,
+			URI:                cfg.LanceDBURI,
+			Region:             cfg.LanceDBRegion,
+			TableName:          cfg.LanceDBTable,
 		})
 		if err != nil {
-			return fmt.Errorf("initialize lancedb compatibility store: %w", err)
+			return fmt.Errorf("initialize lancedb store: %w", err)
 		}
 	default:
 		return fmt.Errorf("unsupported storage backend: %s", cfg.StorageBackend)
 	}
-	if cfg.StorageBackend == config.StorageBackendLanceDB {
-		log.Printf("storage backend: %s (compatibility layer via chromem-go)", cfg.StorageBackend)
-	} else {
-		log.Printf("storage backend: %s", cfg.StorageBackend)
-	}
+	log.Printf("storage backend: %s", cfg.StorageBackend)
 
 	indexOptions := ingestion.IndexOptions{
 		FrameIntervalSec:      cfg.FrameIntervalSec,

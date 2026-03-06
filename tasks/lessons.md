@@ -2,7 +2,7 @@
 
 ## 2026-03-04 — Project Bootstrap
 
-- **No Go SDK for LanceDB.** The VIDERA_MVP_SPEC.md references LanceDB, but as of March 2026 there is no Go client. Use `chromem-go` (pure Go, embedded, zero-dep) for the MVP. Migration path: LanceDB REST API or pgvector in Phase 3.
+- **LanceDB Go SDK exists (`github.com/lancedb/lancedb-go`) but has native packaging requirements.** It requires CGO plus platform-specific native artifacts (`include/lancedb.h` + linked libs), so a repo can still choose `chromem-go` as the default zero-dependency baseline.
 - **Genkit wraps mcp-go.** Google's Genkit Go MCP plugin (`github.com/firebase/genkit/go/plugins/mcp`) imports `mcp-go` under the hood. For a server that *exposes* tools (not calls LLMs), using mcp-go directly gives more control with fewer dependencies.
 - **mcp-go package is `github.com/mark3labs/mcp-go`**, not `mcp-go-sdk` as referenced in the original spec.
 
@@ -238,11 +238,6 @@
 - **Keep a living North Star artifact in-repo.** Teams move faster when each phase maps directly to target-state outcomes instead of only to technical tasks.
 - **Track phase purpose and endpoint together.** For each phase, make explicit what capability it adds and which final release criterion it advances.
 
-## 2026-03-06 — Checkpoint Closure Discipline
-
-- **Blocked phases need explicit activation verdict artifacts.** Recording a dated GO/NO-GO checkpoint avoids ambiguity between "in progress" and "intentionally paused" states.
-- **A single unmet hard-gate criterion should be surfaced as the only blocker.** This keeps re-open conditions clear and prevents churn on already-passing prerequisites.
-
 ## 2026-03-05 — Candidate Mode Execution Hardening
 
 - **Default-value config tests must pin env-sensitive fields explicitly.** Candidate-mode gate runs can export `VIDERA_STORAGE_BACKEND`; tests expecting defaults should set `VIDERA_STORAGE_BACKEND=chromem` to avoid inherited-env false failures.
@@ -277,3 +272,33 @@
 
 - **Use one final decision artifact across environments.** Merging local promotion and deployment parity status into one summary reduces ambiguous GO/NO-GO handoffs.
 - **Allow conditional status only with explicit follow-up actions.** Pending environment runs should be visible, bounded, and tied to concrete next steps.
+
+## 2026-03-06 — Checkpoint Closure Discipline
+
+- **Blocked phases need explicit activation verdict artifacts.** Recording a dated GO/NO-GO checkpoint avoids ambiguity between "in progress" and "intentionally paused" states.
+- **A single unmet hard-gate criterion should be surfaced as the only blocker.** This keeps re-open conditions clear and prevents churn on already-passing prerequisites.
+
+## 2026-03-06 — LanceDB Go Integration Pattern
+
+- **Prefer native SDK path when available and compatible with platform constraints.** `lancedb-go` can be integrated directly while preserving `VectorStore` contract boundaries.
+- **Treat CGO/native artifacts as first-class runtime dependencies.** Native headers/libs and linker flags must be explicit in operator docs and CI setup.
+
+## 2026-03-06 — LanceDB SDK Reality Check
+
+- **`lancedb-go` availability does not remove deployment complexity by itself.** The SDK currently depends on CGO/native artifacts, so builds and containers must package the matching headers/libs per platform.
+- **Keep backend selection explicit and reversible.** Preserve runtime toggle boundaries so native and bridge-backed paths can be compared and rolled back without MCP contract changes.
+
+## 2026-03-06 — Native Dependency Onboarding Guardrail
+
+- **Do not force native SDK prerequisites on every contributor by default.** Keep native backends behind explicit build tags/runtime toggles so default local workflows remain zero-dependency.
+- **Treat cloud-only connection fields as conditional, not global defaults.** For LanceDB, region should be required only for `db://` cloud URIs, not local file-backed paths.
+- **Native mode must be an operator path, not a teammate prerequisite.** Provide first-class Docker/Make flows for `lancedb_native` so production usage is reproducible without burdening default local onboarding.
+
+## 2026-03-06 — LanceDB Native Artifact Architecture Guardrail
+
+- **Do not assume multi-arch Linux artifacts exist for every LanceDB native release.** Validate release bundle contents (`linux_amd64`/`linux_arm64`) before wiring default Docker build targets.
+- **Pin native Docker builds to a known-good platform when artifact coverage is asymmetric.** For current releases, defaulting native Docker build/test lanes to `linux/amd64` avoids arm64 link failures on Apple Silicon hosts.
+
+## 2026-03-06 — Build-Tag Stub Cleanup Pattern
+
+- **Prefer build-tag registration over duplicate stub files when only one implementation should vary by tag.** A shared untagged factory entrypoint plus native `init()` registration keeps default behavior explicit while reducing file clutter.

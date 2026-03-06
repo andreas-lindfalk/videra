@@ -5,6 +5,8 @@ bin
 data
 videos
 .videra-integration-tmp
+lib
+include
 *.log
 coverage.*
 *.out
