@@ -37,6 +37,7 @@
 - Real ingester fallback behavior is deterministic at both initialization and runtime (`clip` unavailable/error -> OCR embedder).
 - Startup capability logs now surface CLIP native shared-library readiness and fallback warning path.
 
-## Known remaining scope
+## Phase closure note
 
-- End-to-end semantic quality validation with a real CLIP model artifact remains pending (`targets/goals` last checkbox in `tasks/todo.md`).
+- End-to-end semantic quality validation was completed in local real-mode smoke with native ONNX Runtime CLIP path.
+- A local run indexed real video content with visual modality present (`visualSegments: 21`) and successful MCP smoke flow (`index_video`, `search_video`, `list_videos`, transcript resource).
